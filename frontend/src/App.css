@@ -1,0 +1,18 @@
+:root { color-scheme: light dark; }
+.wrap {
+  max-width: 34rem; margin: 0 auto; padding: 2.5rem 1rem;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; text-align: left;
+}
+h1 { margin: 0 0 .25rem; font-size: 2rem; }
+.tag { margin: 0 0 1.5rem; opacity: .7; }
+button {
+  font-size: 1.05rem; padding: .8rem 1.4rem; border: 0; border-radius: .6rem;
+  background: #1f6feb; color: #fff; cursor: pointer;
+}
+button:disabled { opacity: .6; cursor: progress; }
+.card { margin-top: 1.5rem; padding: 1rem; border-radius: .6rem; border: 1px solid; }
+.card p { margin: .25rem 0; }
+.ok { border-color: #2ea043; }
+.bad { border-color: #d1242f; }
+code { word-break: break-all; }
+.fine { margin-top: 2.5rem; font-size: .8rem; opacity: .65; }
