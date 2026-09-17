@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Thaam - a companion for online-fraud victims in India.
+  Layer 1: storage (S3 for screenshots and case packs, DynamoDB for cases).
+
+Parameters:
+  ScreenshotRetentionDays:
+    Type: Number
+    Default: 7
+    Description: Days before an uploaded screenshot is deleted automatically.
+  CasePackRetentionDays:
+    Type: Number
+    Default: 90
+    Description: Days before a generated case pack (PDF, letter) is deleted automatically.
+
+Resources:
+  # ------------------------------------------------------------------
+  # S3: private, encrypted, TLS-only, self-deleting evidence storage
+  # ------------------------------------------------------------------
+  EvidenceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # No BucketName: CloudFormation generates a globally unique one.
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteScreenshots
+            Status: Enabled
+            Prefix: uploads/
+            ExpirationInDays: !Ref ScreenshotRetentionDays
+          - Id: DeleteCasePacks
+            Status: Enabled
+            Prefix: packs/
+            ExpirationInDays: !Ref CasePackRetentionDays
+          - Id: CleanUpFailedUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      CorsConfiguration:
+        CorsRules:
+          # Browser uploads go straight to S3 with a presigned URL.
+          # TODO (Fri): restrict AllowedOrigins to the Amplify domain.
+          - AllowedMethods: [PUT, GET]
+            AllowedOrigins: ["*"]
+            AllowedHeaders: ["*"]
+            MaxAge: 3000
+
+  EvidenceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EvidenceBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt EvidenceBucket.Arn
+              - !Sub "${EvidenceBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  # ------------------------------------------------------------------
+  # DynamoDB: one item per case, expires automatically via TTL
+  # ------------------------------------------------------------------
+  CasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: caseId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: caseId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      # Encrypted at rest by default (AWS-owned key, no extra cost).
+      # Point-in-time recovery deliberately OFF: backups would keep
+      # personal data alive after the 90-day deletion promise.
+
+Outputs:
+  EvidenceBucketName:
+    Description: S3 bucket for screenshots and case packs
+    Value: !Ref EvidenceBucket
+  CasesTableName:
+    Description: DynamoDB table for cases
+    Value: !Ref CasesTable
