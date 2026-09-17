@@ -29,6 +29,14 @@ def is_bank_working_day(d: date) -> bool:
     return (d.month, d.day) not in NATIONAL_HOLIDAYS
 
 
+def previous_working_day(d: date) -> date:
+    """The latest bank working day strictly before d."""
+    d -= timedelta(days=1)
+    while not is_bank_working_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
 def add_working_days(start_date: date, n: int) -> date:
     """Return the n-th working day, counting start_date itself if it is one.
 

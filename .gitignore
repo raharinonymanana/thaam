@@ -34,3 +34,5 @@ desktop.ini
 # --- Local test artefacts ---
 *.mp3
 scratch/
+# Holds a real case ID: the victim's only credential.
+backend/scripts/.last_case

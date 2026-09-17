@@ -2,7 +2,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Thaam - a companion for online-fraud victims in India.
-  Layers 1-3b: storage (S3, DynamoDB) + API (HTTP API, create_case, extract, plan and audio Lambdas).
+  Layers 1-4: storage (S3, DynamoDB) + API (create_case, extract, plan, audio)
+  + 90-day email reminders (EventBridge Scheduler, SES) + share-with-family email.
 
 Parameters:
   ScreenshotRetentionDays:
@@ -21,6 +22,19 @@ Parameters:
     Type: String
     Default: "http://localhost:5173"
     Description: Vite dev server origin. Remove this parameter before a public launch.
+  SenderEmail:
+    Type: String
+    Default: raharinonymanana@gmail.com
+    Description: SES-verified sender for reminder emails (verified out of band).
+  AllowDemoMode:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: When true, a reminder enrolment may ask for compressed demo timings.
+  DemoStepSeconds:
+    Type: Number
+    Default: 60
+    Description: Seconds between reminder steps in demo mode (step N fires at N x this).
 
 Globals:
   Function:
@@ -263,6 +277,219 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AudioFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Reminders: one schedule group, one role Scheduler assumes to invoke
+  # the reminder Lambda, and nothing else.
+  # ------------------------------------------------------------------
+  ReminderScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: thaam-reminders
+
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: InvokeReminderFunction
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                # Built from the fixed function name, not !GetAtt: ReminderFunction
+                # reads the API URL, so referencing it here would make the API,
+                # the enrol function and this role a dependency cycle.
+                Resource: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-reminder"
+
+  # ------------------------------------------------------------------
+  # Lambda: POST /cases/{caseId}/reminders -> five one-time schedules
+  # ------------------------------------------------------------------
+  EnrollFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.enroll.lambda_handler
+      Timeout: 15
+      Environment:
+        Variables:
+          SCHEDULE_GROUP: !Ref ReminderScheduleGroup
+          SCHEDULER_ROLE_ARN: !GetAtt SchedulerInvokeRole.Arn
+          REMINDER_FUNCTION_ARN: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-reminder"
+          ALLOW_DEMO_MODE: !Ref AllowDemoMode
+          DEMO_STEP_SECONDS: !Ref DemoStepSeconds
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action:
+                - scheduler:CreateSchedule
+                - scheduler:DeleteSchedule
+                - scheduler:GetSchedule
+              Resource: !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ReminderScheduleGroup}/*"
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: !GetAtt SchedulerInvokeRole.Arn
+              Condition:
+                StringEquals:
+                  iam:PassedToService: scheduler.amazonaws.com
+      Events:
+        Enroll:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: POST
+            Path: /cases/{caseId}/reminders
+
+  EnrollLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${EnrollFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: invoked by Scheduler only, sends one reminder email.
+  # FunctionName is fixed so the enrol function and the Scheduler role can
+  # name it without depending on it (it depends on the API for its links).
+  # ------------------------------------------------------------------
+  ReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-reminder"
+      CodeUri: backend/src/
+      Handler: handlers.reminder.lambda_handler
+      Timeout: 15
+      Environment:
+        Variables:
+          SENDER_EMAIL: !Ref SenderEmail
+          PUBLIC_BASE_URL: !Ref AllowedOrigin
+          API_BASE_URL: !Sub "https://${ThaamApi}.execute-api.${AWS::Region}.amazonaws.com"
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: ses:SendEmail
+              # SES authorises SendEmail against every identity in the request,
+              # the DESTINATION included (in the sandbox each recipient is itself
+              # a verified identity), so pinning Resource to the sender's identity
+              # denies every mail to anyone else. Recipients cannot be enumerated
+              # in advance, so the guarantee is pinned to the From address instead.
+              Resource: !Sub "arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+              Condition:
+                StringEquals:
+                  ses:FromAddress: !Ref SenderEmail
+
+  ReminderLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ReminderFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: GET /r/unsubscribe shows a button (mutates nothing),
+  # POST /r/unsubscribe cancels the reminders.
+  # ------------------------------------------------------------------
+  UnsubscribeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.unsubscribe.lambda_handler
+      Timeout: 15
+      Environment:
+        Variables:
+          SCHEDULE_GROUP: !Ref ReminderScheduleGroup
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: scheduler:DeleteSchedule
+              Resource: !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ReminderScheduleGroup}/*"
+      Events:
+        UnsubscribePage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: GET
+            Path: /r/unsubscribe
+        UnsubscribeConfirm:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: POST
+            Path: /r/unsubscribe
+
+  UnsubscribeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${UnsubscribeFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: POST /cases/{caseId}/family -> one email with the steps only
+  # (no case link: a helper gets the plan, never the case credential)
+  # ------------------------------------------------------------------
+  FamilyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.family.lambda_handler
+      Timeout: 15
+      Environment:
+        Variables:
+          SENDER_EMAIL: !Ref SenderEmail
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: ses:SendEmail
+              # SES authorises SendEmail against every identity in the request,
+              # the DESTINATION included (in the sandbox each recipient is itself
+              # a verified identity), so pinning Resource to the sender's identity
+              # denies every mail to anyone else. Recipients cannot be enumerated
+              # in advance, so the guarantee is pinned to the From address instead.
+              Resource: !Sub "arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+              Condition:
+                StringEquals:
+                  ses:FromAddress: !Ref SenderEmail
+      Events:
+        Family:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: POST
+            Path: /cases/{caseId}/family
+
+  FamilyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${FamilyFunction}"
       RetentionInDays: 14
 
 Outputs:

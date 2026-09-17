@@ -171,12 +171,12 @@ def _clocks(path: str, txn_dt: datetime, reported_at: datetime, now: datetime) -
     return clocks
 
 
-def _spoken_date(d: date, lang: str = "en") -> str:
+def spoken_date(d: date, lang: str = "en") -> str:
     """date(2026, 9, 19) -> '19 September 2026'."""
     return f"{d.day} {_MONTHS[lang][d.month - 1]} {d.year}"
 
 
-def _steps(path: str, clocks: dict) -> list[dict]:
+def action_steps(path: str, clocks: dict) -> list[dict]:
     steps = [
         {"id": "call_1930", "title": "Call 1930 now",
          "detail": "Call the cyber crime helpline and read out the script below.",
@@ -193,7 +193,7 @@ def _steps(path: str, clocks: dict) -> list[dict]:
         steps.append({
             "id": "bank_letter", "title": "Send a written complaint to your bank",
             "detail": "Send the written complaint to your bank before "
-                      + _spoken_date(datetime.fromisoformat(clocks["bankReport"]["deadline"]).date()),
+                      + spoken_date(datetime.fromisoformat(clocks["bankReport"]["deadline"]).date()),
         })
     else:
         steps.append({
@@ -247,7 +247,7 @@ def _text_values(fields: dict, path: str, lang: str) -> dict:
         "amount": format_inr(amount) if amount else unknown,
         "bank": fields.get("bank") or unknown,
         "last4": account_digits[-4:] if account_digits else unknown,
-        "date": _spoken_date(date.fromisoformat(fields["txn_date"]), lang),
+        "date": spoken_date(date.fromisoformat(fields["txn_date"]), lang),
         "time": unknown if time_estimated else fields["txn_time"][:5],
         "utr": space_digits(utr) if utr else unknown,
         "payee": payee,
@@ -288,7 +288,7 @@ def _ssml_values(fields: dict, path: str, lang: str) -> dict:
         "amount": amount_value,
         "bank": _normal(escape(fields["bank"])) if fields.get("bank") else unknown,
         "last4": _slow_digits(account_digits[-4:], 4) if account_digits else unknown,
-        "date": _slow_text(_spoken_date(date.fromisoformat(fields["txn_date"]), lang)),
+        "date": _slow_text(spoken_date(date.fromisoformat(fields["txn_date"]), lang)),
         "time": unknown if time_estimated else _slow_text(fields["txn_time"][:5]),
         "utr": _slow_digits(utr, 4) if utr else unknown,
         "payee": payee,
@@ -372,7 +372,7 @@ def build_plan(fields: dict, shared_credentials: str, reported_at: datetime, now
         "notSure": shared_credentials == "not_sure",
         "timeEstimated": time_estimated,
         "clocks": clocks,
-        "steps": _steps(path, clocks),
+        "steps": action_steps(path, clocks),
         "script": _script(fields, path),
         "disclaimers": list(DISCLAIMERS),
     }

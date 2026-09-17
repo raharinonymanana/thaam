@@ -47,6 +47,18 @@ def polly():
     return _clients["polly"]
 
 
+def scheduler():
+    if "scheduler" not in _clients:
+        _clients["scheduler"] = boto3.client("scheduler")
+    return _clients["scheduler"]
+
+
+def sesv2():
+    if "sesv2" not in _clients:
+        _clients["sesv2"] = boto3.client("sesv2")
+    return _clients["sesv2"]
+
+
 def cases_table():
     if "table" not in _clients:
         _clients["table"] = boto3.resource("dynamodb").Table(TABLE_NAME)
@@ -58,6 +70,14 @@ def json_response(status: int, body) -> dict:
         "statusCode": status,
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body),
+    }
+
+
+def html_response(status: int, html: str) -> dict:
+    return {
+        "statusCode": status,
+        "headers": {"Content-Type": "text/html; charset=utf-8"},
+        "body": html,
     }
 
 
@@ -93,6 +113,12 @@ def case_ref(case_id: str) -> str:
     goes into logs; this hash still lets log lines for one case be joined.
     """
     return hashlib.sha256(case_id.encode("utf-8")).hexdigest()[:12]
+
+
+def address_ref(address: str) -> str:
+    """Fingerprint of an email address for logs. The address itself is personal
+    data and never appears in a log line; this still lets sends be counted."""
+    return hashlib.sha256(address.strip().lower().encode("utf-8")).hexdigest()[:12]
 
 
 def log_event(event: str, **fields) -> None:

@@ -7,7 +7,7 @@ s3_prefix = "thaam"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "ScreenshotRetentionDays=\"7\" CasePackRetentionDays=\"90\" AllowedOrigin=\"https://main.dhg3lzpzbimpz.amplifyapp.com\" DevOrigin=\"http://localhost:5173\""
+parameter_overrides = "ScreenshotRetentionDays=\"7\" CasePackRetentionDays=\"90\" AllowedOrigin=\"https://main.dhg3lzpzbimpz.amplifyapp.com\" DevOrigin=\"http://localhost:5173\" SenderEmail=\"raharinonymanana@gmail.com\" AllowDemoMode=\"true\" DemoStepSeconds=\"60\""
 image_repositories = []
 
 [default.global.parameters]
