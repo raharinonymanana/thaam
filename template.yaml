@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Thaam - a companion for online-fraud victims in India.
-  Layers 1-2: storage (S3, DynamoDB) + API (HTTP API, create_case and extract Lambdas).
+  Layers 1-3a: storage (S3, DynamoDB) + API (HTTP API, create_case, extract and plan Lambdas).
 
 Parameters:
   ScreenshotRetentionDays:
@@ -185,6 +185,36 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${ExtractFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: POST /cases/{caseId}/plan -> deadlines, steps, call script
+  # ------------------------------------------------------------------
+  PlanFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.plan.lambda_handler
+      Timeout: 5
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        Plan:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: POST
+            Path: /cases/{caseId}/plan
+
+  PlanLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${PlanFunction}"
       RetentionInDays: 14
 
 Outputs:
