@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Thaam - a companion for online-fraud victims in India.
-  Layer 1: storage (S3 for screenshots and case packs, DynamoDB for cases).
+  Layers 1-2: storage (S3, DynamoDB) + API (HTTP API, create_case and extract Lambdas).
 
 Parameters:
   ScreenshotRetentionDays:
@@ -13,6 +13,16 @@ Parameters:
     Type: Number
     Default: 90
     Description: Days before a generated case pack (PDF, letter) is deleted automatically.
+
+Globals:
+  Function:
+    Runtime: python3.14
+    Architectures: [x86_64]
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref CasesTable
+        BUCKET_NAME: !Ref EvidenceBucket
 
 Resources:
   # ------------------------------------------------------------------
@@ -52,7 +62,7 @@ Resources:
         CorsRules:
           # Browser uploads go straight to S3 with a presigned URL.
           # TODO (Fri): restrict AllowedOrigins to the Amplify domain.
-          - AllowedMethods: [PUT, GET]
+          - AllowedMethods: [PUT, GET, POST]
             AllowedOrigins: ["*"]
             AllowedHeaders: ["*"]
             MaxAge: 3000
@@ -95,6 +105,88 @@ Resources:
       # Point-in-time recovery deliberately OFF: backups would keep
       # personal data alive after the 90-day deletion promise.
 
+  # ------------------------------------------------------------------
+  # API: HTTP API with two routes, throttled
+  # ------------------------------------------------------------------
+  ThaamApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        # TODO (Fri): restrict AllowOrigins to the Amplify domain.
+        AllowOrigins: ["*"]
+        AllowMethods: [POST, GET, OPTIONS]
+        AllowHeaders: [content-type]
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  # ------------------------------------------------------------------
+  # Lambda: POST /cases -> store consent, return presigned upload form
+  # ------------------------------------------------------------------
+  CreateCaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.create_case.lambda_handler
+      Timeout: 5
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "${EvidenceBucket.Arn}/uploads/*"
+      Events:
+        CreateCase:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: POST
+            Path: /cases
+
+  CreateCaseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${CreateCaseFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: POST /cases/{caseId}/extract -> Textract + SMS parser
+  # ------------------------------------------------------------------
+  ExtractFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.extract.lambda_handler
+      Timeout: 15
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub "${EvidenceBucket.Arn}/uploads/*"
+            - Effect: Allow
+              Action: textract:DetectDocumentText
+              Resource: "*"
+      Events:
+        Extract:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: POST
+            Path: /cases/{caseId}/extract
+
+  ExtractLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ExtractFunction}"
+      RetentionInDays: 14
+
 Outputs:
   EvidenceBucketName:
     Description: S3 bucket for screenshots and case packs
@@ -102,3 +194,6 @@ Outputs:
   CasesTableName:
     Description: DynamoDB table for cases
     Value: !Ref CasesTable
+  ApiUrl:
+    Description: Base URL of the Thaam HTTP API
+    Value: !Sub "https://${ThaamApi}.execute-api.${AWS::Region}.amazonaws.com"
