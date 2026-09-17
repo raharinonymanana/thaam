@@ -17,6 +17,8 @@ _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$")
 # Masked only: a full account number is rejected, never stored.
 _ACCOUNT_MASKED = re.compile(r"^XX\d{1,4}$")
+_MOBILE = re.compile(r"^[6-9]\d{9}$")
+_PHONE_SEPARATORS = re.compile(r"[\s\-.()]")
 
 # Only these keys are stored; anything else the client sends is dropped.
 FIELD_KEYS = ("amount", "utr", "txn_date", "txn_time", "account_masked",
@@ -25,6 +27,18 @@ FIELD_KEYS = ("amount", "utr", "txn_date", "txn_time", "account_masked",
 
 def _bad(field: str, message: str) -> dict:
     return common.json_response(400, {"error": "invalid_field", "field": field, "message": message})
+
+
+def normalise_phone(value: str) -> str | None:
+    """'+91 98765-43210' -> '9876543210'. None if not an Indian mobile number."""
+    digits = _PHONE_SEPARATORS.sub("", value)
+    if digits.startswith("+91"):
+        digits = digits[3:]
+    elif digits.startswith("91") and len(digits) == 12:
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 11:
+        digits = digits[1:]
+    return digits if _MOBILE.match(digits) else None
 
 
 def validate_fields(raw, today: date):
@@ -56,7 +70,12 @@ def validate_fields(raw, today: date):
         return None, ("account_masked",
                       "Enter only the last 4 digits of the account, e.g. XX1234. "
                       "Never enter your full account number.")
-    for key in ("payee_vpa", "payee_phone", "bank"):
+    if fields["payee_phone"]:
+        phone = normalise_phone(fields["payee_phone"])
+        if phone is None:
+            return None, ("payee_phone", "Enter a 10-digit Indian mobile number, e.g. 98765 43210.")
+        fields["payee_phone"] = phone
+    for key in ("payee_vpa", "bank"):
         if fields[key] and len(fields[key]) > MAX_TEXT:
             return None, (key, f"{key} must be at most {MAX_TEXT} characters.")
     return fields, None

@@ -1,12 +1,22 @@
 """Build the victim's action plan: deadlines, ordered steps, 1930 call script.
 
 Pure Python, no AWS calls. Every deadline is an estimate (see working_days).
+
+SSML safety: the audio script is SSML (XML) sent to Polly, and several values
+in it come from the user (bank name, UPI ID, amount...). An unescaped value
+like '</prosody><break time="10s"/>' would inject markup: long silences,
+different speech, or invalid SSML that breaks the audio. Every user-supplied
+value therefore goes through xml.sax.saxutils.escape BEFORE any markup of our
+own (prosody, break) is added around it. Values are only ever placed in element
+text, never in attributes, so escaping &, < and > is sufficient.
 """
 from __future__ import annotations
 
 import math
 import re
 from datetime import date, datetime, time, timedelta
+from string import Formatter
+from xml.sax.saxutils import escape
 
 from working_days import IST, add_working_days
 
@@ -23,6 +33,7 @@ DISCLAIMERS = [
 ]
 
 UNKNOWN = {"en": "[not known]", "hi": "[पता नहीं]"}
+UNKNOWN_SPOKEN = {"en": "not known", "hi": "पता नहीं"}
 
 _MONTHS = {
     "en": ["January", "February", "March", "April", "May", "June", "July",
@@ -31,20 +42,41 @@ _MONTHS = {
            "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"],
 }
 
-_SCRIPT = {
-    "en": (
-        "Hello, I want to report a cyber fraud. Rupees {amount} was debited from my "
-        "{bank} account ending {last4} on {date} at {time}. The UPI reference number, "
-        "the UTR, is {utr}. The money went to {payee}. {path_line} My name is "
-        "[your name] and my mobile number is [your number]."
-    ),
-    "hi": (
-        "नमस्ते, मुझे साइबर धोखाधड़ी की शिकायत दर्ज करानी है। {date} को {time} बजे मेरे "
-        "{bank} खाते से, जिसके आख़िरी चार अंक {last4} हैं, {amount} रुपये कटे हैं। "
-        "यूपीआई रेफ़रेंस नंबर, यानी यूटीआर, {utr} है। पैसे {payee} को गए हैं। "
-        "{path_line} मेरा नाम [अपना नाम] है और मेरा मोबाइल नंबर [अपना नंबर] है।"
-    ),
+# The script, one sentence per entry. The text script joins them with spaces;
+# the SSML script joins them with pauses. Only {placeholders} are user data.
+_SCRIPT_SENTENCES = {
+    "en": [
+        "Hello, I want to report a cyber fraud.",
+        "Rupees {amount} was debited from my {bank} account ending {last4} on {date} at {time}.",
+        "The UPI reference number, the UTR, is {utr}.",
+        "The money went to {payee}.",
+        "{path_line}",
+    ],
+    "hi": [
+        "नमस्ते, मुझे साइबर धोखाधड़ी की शिकायत दर्ज करानी है।",
+        "{date} को {time} बजे मेरे {bank} खाते से, जिसके आख़िरी चार अंक {last4} हैं, {amount} रुपये कटे हैं।",
+        "यूपीआई रेफ़रेंस नंबर, यानी यूटीआर, {utr} है।",
+        "पैसे {payee} को गए हैं।",
+        "{path_line}",
+    ],
 }
+
+# Last sentence: on screen the victim fills the brackets in; in audio they
+# are told to say it themselves.
+_CLOSING_TEXT = {
+    "en": "My name is [your name] and my mobile number is [your number].",
+    "hi": "मेरा नाम [अपना नाम] है और मेरा मोबाइल नंबर [अपना नंबर] है।",
+}
+_CLOSING_SPOKEN = {
+    "en": "Then say your name and your mobile number.",
+    "hi": "फिर अपना नाम और मोबाइल नंबर बताइए।",
+}
+
+_UPI_SPOKEN = {"en": (" at ", " dot "), "hi": (" ऐट ", " डॉट ")}
+
+_SENTENCE_BREAK = '<break time="400ms"/>'
+_DIGIT_BREAK = '<break time="150ms"/>'
+_DIGIT_GROUP_GAP = '<break time="700ms"/>'
 
 _PATH_LINE = {
     "unauthorised": {
@@ -176,23 +208,144 @@ def _steps(path: str, clocks: dict) -> list[dict]:
     return steps
 
 
-def _script(fields: dict, path: str, txn_date: date, time_estimated: bool) -> dict:
+# Script segments for SSML. A value is a list of segments:
+#   ("normal", markup)  spoken at 90%, merged with neighbouring normal text
+#   ("slow", markup)    its own <prosody rate="80%"> block (digits, date, time)
+#   ("gap", markup)     bare pause between two digit groups of the same number
+def _normal(markup: str) -> list[tuple[str, str]]:
+    return [("normal", markup)]
+
+
+def _slow_text(value: str) -> list[tuple[str, str]]:
+    return [("slow", escape(value))]
+
+
+def _slow_digits(digits: str, group: int) -> list[tuple[str, str]]:
+    """Digits one by one with short pauses, groups separated by a longer pause."""
+    segments = []
+    for i, part in enumerate(space_digits(digits, group).split(" ")):
+        if i:
+            segments.append(("gap", _DIGIT_GROUP_GAP))
+        segments.append(("slow", _DIGIT_BREAK.join(escape(d) for d in part)))
+    return segments
+
+
+def _text_values(fields: dict, path: str, lang: str) -> dict:
+    """Placeholder values for the on-screen script (plain text)."""
+    unknown = UNKNOWN[lang]
+    _, time_estimated = _parse_time(fields.get("txn_time"))
     account_digits = re.sub(r"\D", "", fields.get("account_masked") or "")
     amount, utr = fields.get("amount"), fields.get("utr")
+    vpa, phone = fields.get("payee_vpa"), fields.get("payee_phone")
+    if vpa:
+        payee = vpa
+    elif phone:
+        payee = space_digits(phone, 5) if re.fullmatch(r"\d{10}", phone) else phone
+    else:
+        payee = unknown
+    return {
+        "amount": format_inr(amount) if amount else unknown,
+        "bank": fields.get("bank") or unknown,
+        "last4": account_digits[-4:] if account_digits else unknown,
+        "date": _spoken_date(date.fromisoformat(fields["txn_date"]), lang),
+        "time": unknown if time_estimated else fields["txn_time"][:5],
+        "utr": space_digits(utr) if utr else unknown,
+        "payee": payee,
+        "path_line": _PATH_LINE[path][lang],
+    }
+
+
+def _ssml_values(fields: dict, path: str, lang: str) -> dict:
+    """Placeholder values for the audio script, as segment lists.
+
+    Every user-supplied value is escaped (see module docstring) before any
+    markup of our own is added around it.
+    """
+    unknown = _normal(UNKNOWN_SPOKEN[lang])
+    _, time_estimated = _parse_time(fields.get("txn_time"))
+    account_digits = re.sub(r"\D", "", fields.get("account_masked") or "")
+    amount, utr = fields.get("amount"), fields.get("utr")
+    vpa = fields.get("payee_vpa")
+    phone_digits = re.sub(r"\D", "", fields.get("payee_phone") or "")
+
+    if amount:
+        spoken_amount = format_inr(amount)
+        if spoken_amount.endswith(".00"):
+            spoken_amount = spoken_amount[:-3]  # "49,999.00" is spoken as "49,999"
+        amount_value = _normal(escape(spoken_amount))
+    else:
+        amount_value = unknown
+
+    if vpa:
+        at, dot = _UPI_SPOKEN[lang]
+        payee = _normal(escape(vpa.replace("@", at).replace(".", dot)))
+    elif phone_digits:
+        payee = _slow_digits(phone_digits, 5)
+    else:
+        payee = unknown
+
+    return {
+        "amount": amount_value,
+        "bank": _normal(escape(fields["bank"])) if fields.get("bank") else unknown,
+        "last4": _slow_digits(account_digits[-4:], 4) if account_digits else unknown,
+        "date": _slow_text(_spoken_date(date.fromisoformat(fields["txn_date"]), lang)),
+        "time": unknown if time_estimated else _slow_text(fields["txn_time"][:5]),
+        "utr": _slow_digits(utr, 4) if utr else unknown,
+        "payee": payee,
+        "path_line": _normal(_PATH_LINE[path][lang]),
+    }
+
+
+def _script(fields: dict, path: str) -> dict:
     scripts = {}
     for lang in ("en", "hi"):
-        unknown = UNKNOWN[lang]
-        scripts[lang] = _SCRIPT[lang].format(
-            amount=format_inr(amount) if amount else unknown,
-            bank=fields.get("bank") or unknown,
-            last4=account_digits[-4:] if account_digits else unknown,
-            date=_spoken_date(txn_date, lang),
-            time=unknown if time_estimated else fields["txn_time"][:5],
-            utr=space_digits(utr) if utr else unknown,
-            payee=fields.get("payee_vpa") or fields.get("payee_phone") or unknown,
-            path_line=_PATH_LINE[path][lang],
-        )
+        values = _text_values(fields, path, lang)
+        sentences = [s.format(**values) for s in _SCRIPT_SENTENCES[lang]]
+        sentences.append(_CLOSING_TEXT[lang])
+        scripts[lang] = " ".join(sentences)
     return scripts
+
+
+def _render_ssml(segments: list[tuple[str, str]]) -> str:
+    """Flat sequence of prosody blocks: consecutive normal text is merged into
+    one 90% block, each slow item gets its own 80% block, gaps stay bare."""
+    out, normal = [], []
+
+    def flush():
+        if normal:
+            out.append(f'<prosody rate="90%">{"".join(normal)}</prosody>')
+            normal.clear()
+
+    for kind, markup in segments:
+        if kind == "normal":
+            normal.append(markup)
+        else:
+            flush()
+            out.append(f'<prosody rate="80%">{markup}</prosody>' if kind == "slow" else markup)
+    flush()
+    return "".join(out)
+
+
+def build_script_ssml(confirmed_fields: dict, path: str, lang: str) -> str:
+    """SSML for Polly: the call script with digits, date and time read slowly."""
+    if lang not in _SCRIPT_SENTENCES:
+        raise ValueError("lang must be en or hi")
+    if path not in _PATH_LINE:
+        raise ValueError("path must be authorised or unauthorised")
+    values = _ssml_values(confirmed_fields, path, lang)
+    segments: list[tuple[str, str]] = []
+    for i, template in enumerate(_SCRIPT_SENTENCES[lang]):
+        if i:
+            segments.append(("normal", _SENTENCE_BREAK))
+        # Template literals are our own fixed wording; only fields are user data.
+        for literal, name, _, _ in Formatter().parse(template):
+            if literal:
+                segments.append(("normal", literal))
+            if name:
+                segments.extend(values[name])
+    segments.append(("normal", _SENTENCE_BREAK))
+    segments.append(("normal", _CLOSING_SPOKEN[lang]))
+    return f"<speak>{_render_ssml(segments)}</speak>"
 
 
 def build_plan(fields: dict, shared_credentials: str, reported_at: datetime, now: datetime) -> dict:
@@ -220,6 +373,6 @@ def build_plan(fields: dict, shared_credentials: str, reported_at: datetime, now
         "timeEstimated": time_estimated,
         "clocks": clocks,
         "steps": _steps(path, clocks),
-        "script": _script(fields, path, txn_date, time_estimated),
+        "script": _script(fields, path),
         "disclaimers": list(DISCLAIMERS),
     }

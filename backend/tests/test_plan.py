@@ -162,7 +162,9 @@ def test_script_placeholders_for_missing_fields():
 
 def test_payee_phone_used_when_no_vpa():
     fields = dict(FIELDS, payee_vpa=None, payee_phone="9876543210")
-    assert "went to 9876543210" in _plan(fields=fields)["script"]["en"]
+    script = _plan(fields=fields)["script"]
+    assert "went to 98765 43210." in script["en"]
+    assert "पैसे 98765 43210 को गए हैं।" in script["hi"]
 
 
 def test_disclaimers():
@@ -223,6 +225,30 @@ def test_handler_rejects_full_account_number(table, caplog):
     assert body["field"] == "account_masked"
     assert "123456789012" not in caplog.text
     table.update_item.assert_not_called()
+
+
+@pytest.mark.parametrize("raw", ["+91 98765-43210", "098765 43210", "919876543210", "9876543210",
+                                 "(+91) 98765.43210"])
+def test_handler_normalises_payee_phone(table, raw):
+    resp, body = _call(fields=dict(FIELDS, payee_phone=raw))
+    assert resp["statusCode"] == 200
+    stored = table.update_item.call_args.kwargs["ExpressionAttributeValues"][":confirmedFields"]
+    assert stored["payee_phone"] == "9876543210"
+
+
+@pytest.mark.parametrize("raw", ["12345", "5876543210", "98765432101", "+91 5876543210", "98765 4321x"])
+def test_handler_rejects_bad_payee_phone(table, caplog, raw):
+    caplog.set_level(logging.INFO)
+    resp, body = _call(fields=dict(FIELDS, payee_phone=raw))
+    assert resp["statusCode"] == 400
+    assert body["error"] == "invalid_field"
+    assert body["field"] == "payee_phone"
+    table.update_item.assert_not_called()
+    assert raw not in caplog.text
+    assert raw.replace(" ", "") not in caplog.text
+    assert [json.loads(r.getMessage()) for r in caplog.records] == [
+        {"event": "plan", "caseRef": common.case_ref(CASE_ID), "status": "invalid", "field": "payee_phone"}
+    ]
 
 
 def test_handler_rejects_future_date(table):

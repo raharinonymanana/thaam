@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Thaam - a companion for online-fraud victims in India.
-  Layers 1-3a: storage (S3, DynamoDB) + API (HTTP API, create_case, extract and plan Lambdas).
+  Layers 1-3b: storage (S3, DynamoDB) + API (HTTP API, create_case, extract, plan and audio Lambdas).
 
 Parameters:
   ScreenshotRetentionDays:
@@ -215,6 +215,42 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${PlanFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: GET /cases/{caseId}/audio -> Polly speech of the call script
+  # ------------------------------------------------------------------
+  AudioFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.audio.lambda_handler
+      Timeout: 15
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: polly:SynthesizeSpeech
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource: !Sub "${EvidenceBucket.Arn}/packs/*"
+      Events:
+        Audio:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: GET
+            Path: /cases/{caseId}/audio
+
+  AudioLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AudioFunction}"
       RetentionInDays: 14
 
 Outputs:

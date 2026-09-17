@@ -41,6 +41,12 @@ def textract():
     return _clients["textract"]
 
 
+def polly():
+    if "polly" not in _clients:
+        _clients["polly"] = boto3.client("polly")
+    return _clients["polly"]
+
+
 def cases_table():
     if "table" not in _clients:
         _clients["table"] = boto3.resource("dynamodb").Table(TABLE_NAME)
