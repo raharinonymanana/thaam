@@ -13,6 +13,14 @@ Parameters:
     Type: Number
     Default: 90
     Description: Days before a generated case pack (PDF, letter) is deleted automatically.
+  AllowedOrigin:
+    Type: String
+    Default: "https://main.dhg3lzpzbimpz.amplifyapp.com"
+    Description: Origin of the Amplify-hosted Thaam site, allowed to call the API and upload to S3.
+  DevOrigin:
+    Type: String
+    Default: "http://localhost:5173"
+    Description: Vite dev server origin. Remove this parameter before a public launch.
 
 Globals:
   Function:
@@ -60,10 +68,12 @@ Resources:
               DaysAfterInitiation: 1
       CorsConfiguration:
         CorsRules:
-          # Browser uploads go straight to S3 with a presigned URL.
-          # TODO (Fri): restrict AllowedOrigins to the Amplify domain.
+          # Browser uploads go straight to S3 with a presigned POST.
+          # Drop DevOrigin for a real launch: only the Amplify site should upload.
           - AllowedMethods: [PUT, GET, POST]
-            AllowedOrigins: ["*"]
+            AllowedOrigins:
+              - !Ref AllowedOrigin
+              - !Ref DevOrigin
             AllowedHeaders: ["*"]
             MaxAge: 3000
 
@@ -112,8 +122,10 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       CorsConfiguration:
-        # TODO (Fri): restrict AllowOrigins to the Amplify domain.
-        AllowOrigins: ["*"]
+        # Drop DevOrigin for a real launch: only the Amplify site should call the API.
+        AllowOrigins:
+          - !Ref AllowedOrigin
+          - !Ref DevOrigin
         AllowMethods: [POST, GET, OPTIONS]
         AllowHeaders: [content-type]
       DefaultRouteSettings:
