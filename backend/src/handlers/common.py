@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -14,6 +16,9 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "")
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "")
 
 _CASE_ID = re.compile(r"^[A-Za-z0-9_-]{22}$")
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Created on first use and reused across warm invocations. Tests replace
 # entries in this dict with mocks, so nothing ever touches the network.
@@ -73,3 +78,17 @@ def is_valid_case_id(value) -> bool:
 
 def upload_key(case_id: str) -> str:
     return f"uploads/{case_id}"
+
+
+def case_ref(case_id: str) -> str:
+    """Short, stable, non-reversible reference to a case for logs.
+
+    The case ID is the only secret needed to act on a case, so it never
+    goes into logs; this hash still lets log lines for one case be joined.
+    """
+    return hashlib.sha256(case_id.encode("utf-8")).hexdigest()[:12]
+
+
+def log_event(event: str, **fields) -> None:
+    """Log one JSON line. Callers pass only refs, statuses, counts and codes."""
+    logger.info(json.dumps({"event": event, **fields}))

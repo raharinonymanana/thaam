@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -156,3 +157,68 @@ def test_extract_happy_path(aws):
     # Only the parsed fields are persisted - no raw OCR lines.
     assert set(values) == {":fields", ":status", ":extractedAt"}
     assert "Synthetic test image" not in json.dumps(update)
+
+
+# ---------------- Logging: no full case IDs ----------------
+
+def test_case_ref_is_short_stable_and_distinct():
+    ref = common.case_ref(CASE_ID)
+    assert len(ref) == 12
+    assert all(c in "0123456789abcdef" for c in ref)
+    assert common.case_ref(CASE_ID) == ref
+    assert common.case_ref("vutsrqponmlkjihgfedcba") != ref
+
+
+def _log_events(caplog):
+    return [json.loads(r.getMessage()) for r in caplog.records]
+
+
+def test_create_logs_case_ref_not_case_id(aws, caplog):
+    caplog.set_level(logging.INFO)
+    aws["s3"].generate_presigned_post.return_value = {"url": "https://x/", "fields": {}}
+    resp = create_case.lambda_handler(_post({"consent": True, "contentType": "image/png"}), None)
+    case_id = _body(resp)["caseId"]
+
+    assert case_id not in caplog.text
+    assert common.case_ref(case_id) in caplog.text
+    assert _log_events(caplog) == [
+        {"event": "case_created", "caseRef": common.case_ref(case_id), "status": "awaiting_upload"}
+    ]
+
+
+def test_extract_happy_path_logs_case_ref_not_case_id(aws, caplog):
+    caplog.set_level(logging.INFO)
+    aws["table"].get_item.return_value = {"Item": {"caseId": CASE_ID}}
+    aws["textract"].detect_document_text.return_value = {
+        "Blocks": [{"BlockType": "LINE", "Text": t} for t in TEXTRACT_SAMPLE]}
+    resp = extract.lambda_handler(_extract_event(), None)
+
+    assert resp["statusCode"] == 200
+    assert CASE_ID not in caplog.text
+    assert common.case_ref(CASE_ID) in caplog.text
+    # No OCR text or field values either.
+    assert "refund.help99" not in caplog.text
+    assert "49999" not in caplog.text
+
+
+def test_extract_upload_missing_logs_case_ref_not_case_id(aws, caplog):
+    caplog.set_level(logging.INFO)
+    aws["table"].get_item.return_value = {"Item": {"caseId": CASE_ID}}
+    aws["s3"].head_object.side_effect = _client_error("403", "HeadObject")
+    resp = extract.lambda_handler(_extract_event(), None)
+
+    assert resp["statusCode"] == 409
+    assert CASE_ID not in caplog.text
+    assert _log_events(caplog) == [
+        {"event": "upload_missing", "caseRef": common.case_ref(CASE_ID), "s3Code": "403"}
+    ]
+
+
+def test_extract_invalid_case_id_is_not_logged(aws, caplog):
+    caplog.set_level(logging.INFO)
+    bad_id = "not-a-valid-case-id!!"
+    resp = extract.lambda_handler(_extract_event(bad_id), None)
+
+    assert resp["statusCode"] == 400
+    assert caplog.records == []
+    assert common.case_ref(bad_id) not in caplog.text

@@ -1,17 +1,12 @@
 """POST /cases/{caseId}/extract - OCR the uploaded screenshot into fields."""
 from __future__ import annotations
 
-import json
-import logging
 from datetime import datetime, timezone
 
 from botocore.exceptions import ClientError
 
 from handlers import common
 from sms_parser import parse_lines
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 UNREADABLE_ERRORS = {
     "UnsupportedDocumentException",
@@ -33,9 +28,11 @@ def lambda_handler(event, context):
             "error": "invalid_case_id", "message": "Case ID is not valid.",
         })
 
+    # Only a well-formed ID reaches this point; invalid ones are never logged.
+    ref = common.case_ref(case_id)
     item = common.cases_table().get_item(Key={"caseId": case_id}).get("Item")
     if not item:
-        logger.info("extract caseId=%s status=not_found", case_id)
+        common.log_event("extract", caseRef=ref, status="not_found")
         return common.json_response(404, {
             "error": "not_found", "message": "Case not found.",
         })
@@ -46,8 +43,7 @@ def lambda_handler(event, context):
     except ClientError as err:
         s3_code = err.response.get("Error", {}).get("Code")
         if s3_code in MISSING_OBJECT_CODES:
-            logger.info(json.dumps(
-                {"event": "upload_missing", "caseId": case_id, "s3Code": s3_code}))
+            common.log_event("upload_missing", caseRef=ref, s3Code=s3_code)
             return common.json_response(409, {
                 "error": "upload_missing",
                 "message": "No screenshot has been uploaded for this case yet.",
@@ -61,7 +57,7 @@ def lambda_handler(event, context):
     except ClientError as err:
         code = err.response.get("Error", {}).get("Code")
         if code in UNREADABLE_ERRORS:
-            logger.info("extract caseId=%s status=unreadable code=%s", case_id, code)
+            common.log_event("extract", caseRef=ref, status="unreadable", textractCode=code)
             return common.json_response(422, {
                 "error": "unreadable",
                 "message": "We could not read this image. Please enter the details manually.",
@@ -85,8 +81,8 @@ def lambda_handler(event, context):
         },
     )
 
-    logger.info("extract caseId=%s status=extracted lineCount=%d missingCount=%d",
-                case_id, len(lines), len(fields["missing"]))
+    common.log_event("extract", caseRef=ref, status="extracted",
+                     lineCount=len(lines), missingCount=len(fields["missing"]))
     return common.json_response(200, {
         "caseId": case_id, "fields": fields, "lineCount": len(lines),
     })

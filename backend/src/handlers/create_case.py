@@ -1,13 +1,9 @@
 """POST /cases - open a case and hand back a presigned S3 upload form."""
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timedelta, timezone
 
 from handlers import common
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -58,7 +54,7 @@ def lambda_handler(event, context):
         ExpiresIn=UPLOAD_EXPIRES_SECONDS,
     )
 
-    logger.info("case created caseId=%s status=awaiting_upload", case_id)
+    common.log_event("case_created", caseRef=common.case_ref(case_id), status="awaiting_upload")
     return common.json_response(201, {
         "caseId": case_id,
         "upload": {"url": upload["url"], "fields": upload["fields"]},
