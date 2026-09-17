@@ -1,0 +1,4 @@
+# Normalise line endings; shell hooks must stay LF to run in Git Bash
+* text=auto
+.githooks/* text eol=lf
+*.sh text eol=lf

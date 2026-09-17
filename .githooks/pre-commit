@@ -1,0 +1,8 @@
+#!/bin/sh
+# Thaam pre-commit hook: block the commit if gitleaks finds a secret
+# (AWS keys, tokens, passwords) in the staged changes.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks is not installed - commit blocked. Install: winget install Gitleaks.Gitleaks"
+  exit 1
+fi
+gitleaks git --pre-commit --staged --redact --verbose

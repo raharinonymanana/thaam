@@ -1,0 +1,36 @@
+# --- Secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+.aws/
+
+# --- AWS SAM build output ---
+.aws-sam/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Node / Vite ---
+node_modules/
+dist/
+*.local
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Local test artefacts ---
+*.mp3
+scratch/
