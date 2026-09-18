@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { ApiError, getAudio } from "../api";
 import { deadlineRows, ESTIMATED_NOTE, goldenHourLine } from "../format";
-import { Notice } from "./Notice";
+import { ErrorNotice, Notice } from "./Notice";
+import CopyBox from "./CopyBox";
 import FamilySection from "./FamilySection";
 import RemindersSection from "./RemindersSection";
+import { bankLetter, LETTER_DISCLAIMER, ncrpText } from "../copytext";
 
 // The plan, rendered once and used twice: straight after POST /plan, and again
 // when a victim comes back to GET /cases/{id} from a reminder email. Both
@@ -151,6 +153,79 @@ function Steps({ steps }) {
   );
 }
 
+/** D121: the two documents the victim has to produce, built here from the
+ * details they confirmed. The letter is unauthorised-only - on the authorised
+ * path bankLetter returns null and nothing is rendered, because there is no
+ * unauthorised transaction to report and no liability cap to claim. */
+function Documents({ fields, path }) {
+  const letter = bankLetter(fields, path);
+  return (
+    <>
+      <CopyBox
+        id="copy-ncrp"
+        title="Text for cybercrime.gov.in"
+        note="Paste this into the description box when you file your complaint."
+        text={ncrpText(fields, path)}
+        rows={10}
+      />
+      {letter && (
+        <CopyBox
+          id="copy-letter"
+          title="Letter to your bank"
+          note={LETTER_DISCLAIMER}
+          text={letter}
+          rows={18}
+        />
+      )}
+    </>
+  );
+}
+
+/** D120: the victim does not have to wait 90 days. The confirm is inline and
+ * says plainly what goes, because this one really cannot be undone. */
+function DeleteCase({ confirming, ui, onRequest, onCancel, onConfirm }) {
+  return (
+    <section className="card danger">
+      <h2>Delete my case now</h2>
+      {!confirming ? (
+        <>
+          <p className="hint">
+            Removes your screenshot, your plan and your reminders straight away.
+          </p>
+          <button type="button" className="button button-quiet" onClick={onRequest}>
+            Delete my case now
+          </button>
+        </>
+      ) : (
+        <>
+          <p>
+            This deletes your screenshot, your plan and your reminders right
+            now. It cannot be undone.
+          </p>
+          <ErrorNotice error={ui.error} />
+          <button
+            type="button"
+            className="button button-danger"
+            onClick={onConfirm}
+            disabled={ui.busy}
+            aria-busy={ui.busy}
+          >
+            {ui.busy ? "Deleting…" : "Yes, delete everything"}
+          </button>
+          <button
+            type="button"
+            className="button button-quiet"
+            onClick={onCancel}
+            disabled={ui.busy}
+          >
+            Cancel
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 /** D117: leaving is a deliberate act, and the confirm is inline rather than a
  * window.confirm - a native dialog blocks the page, reads as a browser warning
  * and cannot say the one thing that matters, which is that the current plan is
@@ -175,10 +250,15 @@ function StartNewCase({ confirming, onRequest, onCancel, onConfirm }) {
 }
 
 export default function PlanView({
-  caseId, plan, reminders, remindersUi, family, familyUi, demoMode,
-  confirmRestart, onEnrol, onShare, onRestartRequest, onRestartCancel, onRestart,
+  caseId, plan, fields, reminders, remindersUi, family, familyUi, demoMode,
+  confirmRestart, confirmDelete, deleteUi,
+  onEnrol, onShare, onRestartRequest, onRestartCancel, onRestart,
+  onDeleteRequest, onDeleteCancel, onDelete,
 }) {
   if (!plan) return null;
+  // A reopened case carries its own confirmed fields; a freshly built plan
+  // does not, so the flow's own copy is used there.
+  const values = plan.fields ?? fields ?? {};
 
   return (
     <div className="plan">
@@ -194,6 +274,7 @@ export default function PlanView({
       <Script caseId={caseId} script={plan.script} />
       <Deadlines clocks={plan.clocks} />
       <Steps steps={plan.steps} />
+      <Documents fields={values} path={plan.path} />
 
       <section className="card">
         <h2>Keep this page</h2>
@@ -202,6 +283,14 @@ export default function PlanView({
           can see your case — don&apos;t share it.
         </p>
       </section>
+
+      <DeleteCase
+        confirming={confirmDelete}
+        ui={deleteUi}
+        onRequest={onDeleteRequest}
+        onCancel={onDeleteCancel}
+        onConfirm={onDelete}
+      />
 
       <RemindersSection
         reminders={reminders}

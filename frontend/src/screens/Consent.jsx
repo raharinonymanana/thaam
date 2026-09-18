@@ -5,7 +5,7 @@ import Screen from "../components/Screen";
  * Nothing on this screen calls the API: consent travels with the request that
  * creates the case, at the moment the screenshot is actually uploaded.
  */
-export default function Consent({ consent, onToggle, onContinue }) {
+export default function Consent({ consent, onToggle, onContinue, onOpenPrivacy }) {
   return (
     <Screen title="Before we start">
       <p className="lead">
@@ -40,6 +40,12 @@ export default function Consent({ consent, onToggle, onContinue }) {
         />
         <span>I agree to Thaam storing my screenshot and case details as described above.</span>
       </label>
+
+      <p className="privacy-link">
+        <button type="button" className="linkish" onClick={onOpenPrivacy}>
+          How Thaam handles your data
+        </button>
+      </p>
 
       <button
         type="button"

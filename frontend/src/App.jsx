@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
-  ApiError, buildPlan, createCase, enrolReminders, extract, getCase,
+  ApiError, buildPlan, createCase, deleteCase, enrolReminders, extract, getCase,
   shareWithFamily, uploadToS3, UNEXPECTED_MESSAGE,
 } from "./api";
 import { clearCaseHash, parseCaseHash, setCaseHash } from "./hash";
@@ -13,7 +13,9 @@ import Case from "./screens/Case";
 import Consent from "./screens/Consent";
 import Extracting from "./screens/Extracting";
 import Fields from "./screens/Fields";
+import Deleted from "./screens/Deleted";
 import Plan from "./screens/Plan";
+import Privacy from "./screens/Privacy";
 import Triage from "./screens/Triage";
 import Upload from "./screens/Upload";
 
@@ -189,6 +191,24 @@ export default function App() {
     }
   }
 
+  async function removeCase() {
+    if (state.deleteUi.busy) return;
+    dispatch({ type: "delete_submitting" });
+    try {
+      await deleteCase(state.caseId);
+    } catch (err) {
+      // 404 means it is already gone, which is the outcome that was asked for.
+      if (!(err instanceof ApiError && err.status === 404)) {
+        dispatch({ type: "delete_failed", error: notice(err) });
+        return;
+      }
+    }
+    requested.current = null;
+    // The link must not survive the case it points at (keeps ?demo=1).
+    clearCaseHash();
+    dispatch({ type: "delete_succeeded" });
+  }
+
   function restart() {
     requested.current = null;
     // Keeps ?demo=1 (D112); only the case fragment goes.
@@ -209,7 +229,14 @@ export default function App() {
     onRestartRequest: () => dispatch({ type: "restart_requested" }),
     onRestartCancel: () => dispatch({ type: "restart_cancelled" }),
     onRestart: restart,
+    confirmDelete: state.confirmDelete,
+    deleteUi: state.deleteUi,
+    onDeleteRequest: () => dispatch({ type: "delete_requested" }),
+    onDeleteCancel: () => dispatch({ type: "delete_cancelled" }),
+    onDelete: removeCase,
   };
+
+  const openPrivacy = () => dispatch({ type: "privacy_opened" });
 
   return (
     <div className="app">
@@ -224,6 +251,7 @@ export default function App() {
             consent={state.consent}
             onToggle={(value) => dispatch({ type: "consent_toggled", value })}
             onContinue={() => dispatch({ type: "consent_given" })}
+            onOpenPrivacy={openPrivacy}
           />
         )}
 
@@ -270,8 +298,14 @@ export default function App() {
         )}
 
         {state.screen === "plan" && (
-          <Plan caseId={state.caseId} plan={state.plan} {...planProps} />
+          <Plan caseId={state.caseId} plan={state.plan} fields={state.fields} {...planProps} />
         )}
+
+        {state.screen === "privacy" && (
+          <Privacy onBack={() => dispatch({ type: "privacy_closed" })} />
+        )}
+
+        {state.screen === "deleted" && <Deleted onRestart={restart} />}
 
         {state.screen === "case" && (
           <Case
@@ -286,7 +320,7 @@ export default function App() {
         )}
       </main>
 
-      <Footer />
+      <Footer onOpenPrivacy={openPrivacy} />
     </div>
   );
 }

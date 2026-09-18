@@ -8,7 +8,8 @@
 
 import { FAMILY_MAX_SENDS, fromCase, fromEnrolment } from "./reminders";
 
-export const SCREENS = ["consent", "upload", "extracting", "fields", "triage", "plan", "case"];
+export const SCREENS = ["consent", "upload", "extracting", "fields", "triage",
+  "plan", "case", "privacy", "deleted"];
 
 // The eight details the plan is built from. sender_id, direction and missing
 // come back from extract too, but they are not fields the victim confirms.
@@ -50,6 +51,14 @@ export const initialState = {
   family: { sendsRemaining: FAMILY_MAX_SENDS, sent: false },
   familyUi: { busy: false, error: null },
   confirmRestart: false,
+
+  // The privacy page is reachable from every screen, so it remembers where it
+  // was opened from: someone who reads it half way through filling the form
+  // must come back to the form, not to the start.
+  returnTo: null,
+
+  confirmDelete: false,
+  deleteUi: { busy: false, error: null },
 };
 
 function hasText(value) {
@@ -269,6 +278,32 @@ export function reducer(state, action) {
 
     case "restart_cancelled":
       return { ...state, confirmRestart: false };
+
+    case "privacy_opened":
+      // Opening it from itself would make Back point at itself.
+      if (state.screen === "privacy") return state;
+      return { ...state, screen: "privacy", returnTo: state.screen };
+
+    case "privacy_closed":
+      return { ...state, screen: state.returnTo ?? "consent", returnTo: null };
+
+    case "delete_requested":
+      return { ...state, confirmDelete: true, deleteUi: { busy: false, error: null } };
+
+    case "delete_cancelled":
+      return { ...state, confirmDelete: false, deleteUi: { busy: false, error: null } };
+
+    case "delete_submitting":
+      return { ...state, deleteUi: { busy: true, error: null } };
+
+    case "delete_succeeded":
+      // Everything goes, not just the screen: the caseId, the plan, the
+      // fields and the file all leave memory with it (D120).
+      return { ...initialState, screen: "deleted" };
+
+    case "delete_failed":
+      // The case is still there, so the confirm stays open to be retried.
+      return { ...state, deleteUi: { busy: false, error: action.error ?? null } };
 
     case "case_not_found":
       return { ...state, screen: "case", busy: false, error: null, notFound: true, caseView: null };

@@ -127,6 +127,32 @@ describe("fromCase", () => {
     expect(reminders.status).toBe("active");
   });
 
+  it("carries the skip reason GET now returns, so the full text shows again", () => {
+    const reminders = fromCase({
+      status: "active",
+      demo: false,
+      steps: [
+        { step: "bank_ack", fireAt: null, status: "skipped",
+          sentAt: null, reason: "deadline_passed" },
+        { step: "closeout", fireAt: null, status: "skipped",
+          sentAt: null, reason: "case_expiring" },
+      ],
+    });
+    expect(stepStatus(reminders.steps[0], formatIstDate).text)
+      .toBe("Skipped — this date has already passed");
+    expect(stepStatus(reminders.steps[1], formatIstDate).text)
+      .toBe("Skipped — your case closes before this date");
+  });
+
+  it("still copes with a null reason", () => {
+    const reminders = fromCase({
+      status: "active", demo: false,
+      steps: [{ step: "bank_ack", fireAt: null, status: "skipped",
+        sentAt: null, reason: null }],
+    });
+    expect(stepStatus(reminders.steps[0], formatIstDate).text).toBe("Skipped");
+  });
+
   it("is null when the case was never enrolled", () => {
     expect(fromCase(null)).toBeNull();
     expect(fromCase(undefined)).toBeNull();

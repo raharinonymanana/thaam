@@ -81,6 +81,13 @@ export function getCase(caseId) {
   return request(`/cases/${caseId}`);
 }
 
+/** Erase the case now (D120). The backend deletes schedules, then objects,
+ * then the item, so a 502 means nothing was half-removed that a retry cannot
+ * finish - and a 404 means it is already gone, which is the same outcome. */
+export function deleteCase(caseId) {
+  return request(`/cases/${caseId}`, { method: "DELETE" });
+}
+
 export function buildPlan(caseId, { fields, sharedCredentials }) {
   return request(`/cases/${caseId}/plan`, {
     method: "POST",

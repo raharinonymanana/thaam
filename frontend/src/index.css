@@ -594,3 +594,58 @@ ul.plain li { margin-bottom: 0.35rem; }
 
 .start-new.confirm p { margin: 0; }
 .start-new.confirm .button { margin-top: 0.75rem; }
+
+/* ---------- copy boxes (D121) ---------- */
+
+.copy-text {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--sans, inherit);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.card h2 label { cursor: pointer; }
+
+.copy-status {
+  margin: 0.4rem 0 0;
+  min-height: 1.2em;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ---------- delete (D120) ---------- */
+
+.danger { border-color: var(--error-line); }
+
+.button-danger {
+  background: var(--error-line);
+  color: #fff;
+  border-color: var(--error-line);
+}
+
+@media (prefers-color-scheme: dark) {
+  .button-danger { color: #2b1c19; }
+}
+
+/* ---------- privacy ---------- */
+
+.back { margin-top: 0; margin-bottom: 1rem; }
+
+.privacy-link { margin: 1rem 0 0; }
+
+.footer .linkish {
+  padding-left: 0;
+  font-size: 0.85rem;
+}
+
+.footer p { margin: 0.5rem 0 0; }

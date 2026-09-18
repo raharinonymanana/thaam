@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { deadlineRows, ESTIMATED_NOTE, formatIstDate, goldenHourLine } from "../format";
+import {
+  deadlineRows, ESTIMATED_NOTE, formatInr, formatIstDate, formatLongDate, goldenHourLine,
+} from "../format";
 
 // The clocks POST /plan really returns for a case planned on 17 Sep 2026.
 const UNAUTHORISED = {
@@ -123,5 +125,48 @@ describe("goldenHourLine", () => {
   it("has nothing to say without a clock", () => {
     expect(goldenHourLine(null)).toBeNull();
     expect(goldenHourLine(undefined)).toBeNull();
+  });
+});
+
+describe("formatLongDate", () => {
+  it("writes the month out in full, for a complaint and a letter", () => {
+    expect(formatLongDate("2026-09-17")).toBe("17 September 2026");
+    expect(formatLongDate("2026-01-05")).toBe("5 January 2026");
+    expect(formatLongDate("2026-12-31")).toBe("31 December 2026");
+  });
+
+  it("does not shift the day for a browser west of India", () => {
+    // Parsed from the parts, never through a Date, so there is no zone to slip.
+    expect(formatLongDate("2026-09-01")).toBe("1 September 2026");
+  });
+
+  it("returns nothing for a value it cannot read", () => {
+    for (const value of ["", null, undefined, 42, "17-09-2026", "2026-13-01", "2026-9-1"]) {
+      expect(formatLongDate(value)).toBe("");
+    }
+  });
+});
+
+describe("formatInr", () => {
+  it("groups the Indian way: three, then pairs", () => {
+    expect(formatInr("49999.00")).toBe("49,999.00");
+    expect(formatInr("1234567.5")).toBe("12,34,567.50");
+    expect(formatInr("250")).toBe("250.00");
+    expect(formatInr("1000")).toBe("1,000.00");
+    expect(formatInr("100000")).toBe("1,00,000.00");
+    expect(formatInr("10000000")).toBe("1,00,00,000.00");
+  });
+
+  it("always shows two decimals", () => {
+    expect(formatInr("0.5")).toBe("0.50");
+    expect(formatInr("7")).toBe("7.00");
+  });
+
+  it("returns nothing rather than a wrong figure", () => {
+    // "" and null both become 0 through Number(), and "₹0.00" on a police
+    // complaint is a worse answer than leaving the line out.
+    for (const value of ["", "   ", null, undefined, "abc", "49,999", "-5", {}, []]) {
+      expect(formatInr(value), String(value)).toBe("");
+    }
   });
 });

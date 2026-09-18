@@ -7,12 +7,17 @@ const DISCLAIMERS = [
   "Deadlines are estimated; act before the dates shown.",
 ];
 
-export default function Footer() {
+export default function Footer({ onOpenPrivacy }) {
   return (
     <footer className="footer">
       <ul>
         {DISCLAIMERS.map((line) => <li key={line}>{line}</li>)}
       </ul>
+      <p>
+        <button type="button" className="linkish" onClick={onOpenPrivacy}>
+          How Thaam handles your data
+        </button>
+      </p>
     </footer>
   );
 }

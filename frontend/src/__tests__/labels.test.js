@@ -16,6 +16,8 @@ import Consent from "../screens/Consent";
 import Upload from "../screens/Upload";
 import Fields from "../screens/Fields";
 import Triage from "../screens/Triage";
+import Privacy from "../screens/Privacy";
+import Deleted from "../screens/Deleted";
 import PlanView from "../components/PlanView";
 import { pickFields } from "../state";
 
@@ -32,8 +34,11 @@ const planView = (props) => h(PlanView, {
   reminders: null, remindersUi: { busy: false, error: null },
   family: { sendsRemaining: 3, sent: false }, familyUi: { busy: false, error: null },
   demoMode: true, confirmRestart: false,
+  fields: pickFields({ amount: "250", txn_date: "2026-09-17" }),
+  confirmDelete: false, deleteUi: { busy: false, error: null },
   onEnrol: () => {}, onShare: () => {},
   onRestartRequest: () => {}, onRestartCancel: () => {}, onRestart: () => {},
+  onDeleteRequest: () => {}, onDeleteCancel: () => {}, onDelete: () => {},
   ...props,
 });
 
@@ -51,14 +56,23 @@ const SCREENS = {
     onAnswer: () => {}, onSubmit: () => {}, onBack: () => {},
   }),
   plan: planView({}),
+  privacy: h(Privacy, { onBack: () => {} }),
+  deleted: h(Deleted, { onRestart: () => {} }),
 };
 
-/** Every <input> in the markup, with its id and type. */
+/** Every form control in the markup, with its id and type.
+ *
+ * Textareas count: the two copy boxes are read-only textareas, and an
+ * unlabelled one is announced as "edit text, blank" with no clue what it
+ * holds or what the Copy button beside it would copy.
+ */
 function inputs(html) {
-  return [...html.matchAll(/<input\b[^>]*>/g)].map(([tag]) => ({
+  return [...html.matchAll(/<(input|textarea)\b[^>]*>/g)].map(([tag, element]) => ({
     tag,
     id: /\bid="([^"]+)"/.exec(tag)?.[1] ?? null,
-    type: /\btype="([^"]+)"/.exec(tag)?.[1] ?? "text",
+    type: element === "textarea"
+      ? "textarea"
+      : /\btype="([^"]+)"/.exec(tag)?.[1] ?? "text",
   }));
 }
 
@@ -79,7 +93,12 @@ describe.each(Object.entries(SCREENS))("%s screen", (name, element) => {
 
   it("gives every input an id and a label carrying its visible text", () => {
     const found = inputs(html);
-    expect(found.length).toBeGreaterThan(0);
+    // The screens that ask for something must still be asking: a form that
+    // silently stopped rendering would otherwise pass this file trivially.
+    // Privacy and the deleted confirmation are text and buttons only.
+    if (!["privacy", "deleted"].includes(name)) {
+      expect(found.length, `${name} renders no form controls at all`).toBeGreaterThan(0);
+    }
     for (const input of found) {
       expect(input.id, `an input on ${name} has no id: ${input.tag}`).toBeTruthy();
       const text = labelTextFor(html, input.id);
@@ -128,8 +147,9 @@ describe("the named cases from the bug report", () => {
   });
 });
 
-// Types the browser draws itself; the stylesheet leaves them alone.
-const UNSTYLED_TYPES = ["button", "submit", "checkbox", "radio", "file"];
+// Types the browser draws itself, plus the textarea, which the copy boxes
+// style through their own .copy-text class rather than by input type.
+const UNSTYLED_TYPES = ["button", "submit", "checkbox", "radio", "file", "textarea"];
 
 describe("the stylesheet covers every text-like input", () => {
   const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");

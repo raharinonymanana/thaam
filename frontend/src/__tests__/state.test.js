@@ -511,6 +511,133 @@ describe("start a new case (D117)", () => {
   });
 });
 
+describe("delete my case now (D120)", () => {
+  const onPlan = run([
+    { type: "uploaded", caseId: CASE_ID },
+    { type: "extract_succeeded", fields: FIELDS },
+    { type: "plan_succeeded", plan: { path: "unauthorised" } },
+  ]);
+
+  it("asks before it deletes anything", () => {
+    const asking = reducer(onPlan, { type: "delete_requested" });
+    expect(asking.confirmDelete).toBe(true);
+    expect(asking.screen).toBe("plan");
+    expect(asking.caseId).toBe(CASE_ID);
+    expect(asking.deleteUi).toEqual({ busy: false, error: null });
+  });
+
+  it("cancelling changes nothing at all", () => {
+    const state = run([{ type: "delete_requested" }, { type: "delete_cancelled" }], onPlan);
+    expect(state).toEqual(onPlan);
+  });
+
+  it("leaves nothing of the case behind on success", () => {
+    const state = run([
+      { type: "delete_requested" },
+      { type: "delete_submitting" },
+      { type: "delete_succeeded" },
+    ], onPlan);
+    expect(state.screen).toBe("deleted");
+    expect(state).toEqual({ ...initialState, screen: "deleted" });
+    expect(state.caseId).toBeNull();
+    expect(state.plan).toBeNull();
+    expect(state.fields).toBeNull();
+    expect(state.reminders).toBeNull();
+    expect(state.confirmDelete).toBe(false);
+  });
+
+  it("treats an already-deleted case the same way (404)", () => {
+    // The handler turns a 404 into the same action: gone is gone.
+    const state = run([{ type: "delete_submitting" }, { type: "delete_succeeded" }], onPlan);
+    expect(state).toEqual({ ...initialState, screen: "deleted" });
+  });
+
+  it("a 502 keeps the case and offers the retry", () => {
+    const error = {
+      message: "We could not finish deleting your case. Please try again.",
+      code: "delete_incomplete",
+    };
+    const state = run([
+      { type: "delete_requested" },
+      { type: "delete_submitting" },
+      { type: "delete_failed", error },
+    ], onPlan);
+    expect(state.screen).toBe("plan");
+    expect(state.caseId).toBe(CASE_ID);
+    expect(state.plan).toEqual(onPlan.plan);
+    // The confirm stays open, so the button to try again is right there.
+    expect(state.confirmDelete).toBe(true);
+    expect(state.deleteUi).toEqual({ busy: false, error });
+  });
+
+  it("a retry after a 502 clears the last error", () => {
+    const state = run([
+      { type: "delete_requested" },
+      { type: "delete_submitting" },
+      { type: "delete_failed", error: { message: "x" } },
+      { type: "delete_submitting" },
+    ], onPlan);
+    expect(state.deleteUi).toEqual({ busy: true, error: null });
+  });
+
+  it("starting again from the deleted screen goes back to consent", () => {
+    const deleted = run([
+      { type: "delete_submitting" }, { type: "delete_succeeded" },
+    ], onPlan);
+    expect(reducer(deleted, { type: "restart" })).toEqual(initialState);
+  });
+});
+
+describe("the privacy page", () => {
+  it("comes back to the exact screen it was opened from", () => {
+    const midFlow = run([
+      { type: "uploaded", caseId: CASE_ID },
+      { type: "extract_succeeded", fields: FIELDS },
+      { type: "field_changed", key: "bank", value: "Sample Bank" },
+    ]);
+    const reading = reducer(midFlow, { type: "privacy_opened" });
+    expect(reading.screen).toBe("privacy");
+    expect(reading.returnTo).toBe("fields");
+
+    const back = reducer(reading, { type: "privacy_closed" });
+    expect(back.screen).toBe("fields");
+    expect(back.returnTo).toBeNull();
+    // Nothing typed is lost by reading the privacy page.
+    expect(back.fields.bank).toBe("Sample Bank");
+    expect(back.caseId).toBe(CASE_ID);
+    expect(back).toEqual(midFlow);
+  });
+
+  it("works from every screen it is reachable from", () => {
+    const states = {
+      consent: initialState,
+      upload: run([{ type: "consent_toggled", value: true }, { type: "consent_given" }]),
+      triage: run([
+        { type: "extract_succeeded", fields: FIELDS }, { type: "fields_accepted" },
+      ]),
+      plan: reducer(initialState, { type: "plan_succeeded", plan: { path: "unauthorised" } }),
+    };
+    for (const [screen, state] of Object.entries(states)) {
+      const reading = reducer(state, { type: "privacy_opened" });
+      expect(reading.returnTo, screen).toBe(screen);
+      expect(reducer(reading, { type: "privacy_closed" }), screen).toEqual(state);
+    }
+  });
+
+  it("opening it from itself does not trap Back on the privacy page", () => {
+    const reading = reducer(initialState, { type: "privacy_opened" });
+    const again = reducer(reading, { type: "privacy_opened" });
+    expect(again).toBe(reading);
+    expect(again.returnTo).toBe("consent");
+    expect(reducer(again, { type: "privacy_closed" }).screen).toBe("consent");
+  });
+
+  it("falls back to consent if there is somehow nowhere to return to", () => {
+    const stranded = { ...initialState, screen: "privacy", returnTo: null };
+    expect(reducer(stranded, { type: "privacy_closed" }).screen).toBe("consent");
+  });
+});
+
 describe("unknown actions", () => {
   it("throws, because a bad dispatch is our bug", () => {
     expect(() => reducer(initialState, { type: "nope" })).toThrow(/Unknown action/);
