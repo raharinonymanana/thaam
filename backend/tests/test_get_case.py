@@ -188,7 +188,7 @@ def test_the_handler_never_writes(table):
 
 # Attributes of the stored reminders that must never be echoed.
 PRIVATE_REMINDER_KEYS = ("email", "unsubToken", "scheduleName", "realDueDate",
-                         "reason", "enrolledAt")
+                         "enrolledAt")
 
 
 def test_response_carries_no_email_and_no_unsub_token(table):
@@ -212,15 +212,19 @@ def test_response_carries_no_email_and_no_unsub_token(table):
     assert SENT_AT in raw
 
 
-def test_reminder_steps_expose_only_the_four_safe_keys(table):
+SAFE_STEP_KEYS = {"step", "fireAt", "status", "sentAt", "reason"}
+
+
+def test_reminder_steps_expose_only_the_five_safe_keys(table):
     table.get_item.return_value = {"Item": _item(reminders=_reminders_attr())}
     _, body = _call()
     assert body["reminders"]["status"] == "active"
     assert body["reminders"]["demo"] is False
     assert body["reminders"]["steps"] == [
         {"step": "bank_ack", "fireAt": "2026-09-18T10:00:00+05:30",
-         "status": "scheduled", "sentAt": None},
-        {"step": "liability_window", "fireAt": None, "status": "skipped", "sentAt": None},
+         "status": "scheduled", "sentAt": None, "reason": None},
+        {"step": "liability_window", "fireAt": None, "status": "skipped",
+         "sentAt": None, "reason": "deadline_passed"},
     ]
 
 
@@ -232,7 +236,7 @@ def test_sent_at_is_reported_when_the_reminder_went_out(table):
     assert steps[0]["status"] == "scheduled"
     # A step the handler has not reached yet reports null, not a missing key.
     assert steps[1]["sentAt"] is None
-    assert all(set(s) == {"step", "fireAt", "status", "sentAt"} for s in steps)
+    assert all(set(s) == SAFE_STEP_KEYS for s in steps)
 
 
 def test_sent_at_is_null_when_nothing_has_been_sent(table):
@@ -240,6 +244,39 @@ def test_sent_at_is_null_when_nothing_has_been_sent(table):
     _, body = _call()
     assert [s["sentAt"] for s in body["reminders"]["steps"]] == [None, None]
     assert all("sentAt" in s for s in body["reminders"]["steps"])
+
+
+@pytest.mark.parametrize("reason", ["deadline_passed", "case_expiring"])
+def test_a_skipped_step_says_why(table, reason):
+    # Without this a returning victim sees a bare "Skipped" and cannot tell a
+    # passed deadline from a case that closes before the date.
+    reminders = _reminders_attr()
+    reminders["steps"][1]["reason"] = reason
+    table.get_item.return_value = {"Item": _item(reminders=reminders)}
+    _, body = _call()
+    assert body["reminders"]["steps"][1]["reason"] == reason
+
+
+@pytest.mark.parametrize("reason", [
+    "something_new", "", None, 42, "deadline_passed ", "DEADLINE_PASSED",
+])
+def test_an_unknown_reason_is_dropped_not_passed_through(table, reason):
+    # These two strings are wording written for a victim to read. A reason
+    # added to the backend later must not reach the screen raw.
+    reminders = _reminders_attr()
+    reminders["steps"][1]["reason"] = reason
+    table.get_item.return_value = {"Item": _item(reminders=reminders)}
+    resp, body = _call()
+    assert body["reminders"]["steps"][1]["reason"] is None
+    if isinstance(reason, str) and reason.strip():
+        assert reason not in resp["body"]
+
+
+def test_a_scheduled_step_has_no_reason(table):
+    table.get_item.return_value = {"Item": _item(reminders=_reminders_attr())}
+    _, body = _call()
+    assert body["reminders"]["steps"][0]["status"] == "scheduled"
+    assert body["reminders"]["steps"][0]["reason"] is None
 
 
 def test_reminders_null_when_never_enrolled(table):
@@ -389,10 +426,15 @@ def test_get_case_function_can_only_read_one_item():
 
 
 def test_get_case_route_is_its_own_function():
-    assert TEMPLATE.count("Path: /cases/{caseId}\n") == 1
-    # The read route must not be bolted onto a function that can also write.
-    assert "Method: GET" not in _resource_block("PlanFunction")
+    # Two functions answer on this path - GET to read it, DELETE to erase it -
+    # and each carries only the permissions its own verb needs.
+    assert TEMPLATE.count("Path: /cases/{caseId}\n") == 2
     assert "Path: /cases/{caseId}\n" in _resource_block("GetCaseFunction")
+    assert "Path: /cases/{caseId}\n" in _resource_block("DeleteCaseFunction")
+    # Neither is bolted onto a function that can write the case.
+    assert "Method: GET" not in _resource_block("PlanFunction")
+    assert "Method: DELETE" not in _resource_block("PlanFunction")
+    assert "Method: DELETE" not in _resource_block("GetCaseFunction")
 
 
 def test_get_case_has_a_retained_log_group():

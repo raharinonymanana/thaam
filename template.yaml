@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Thaam - a companion for online-fraud victims in India.
-  Layers 1-4: storage (S3, DynamoDB) + API (create_case, extract, plan, audio, get_case)
+  Layers 1-5: storage (S3, DynamoDB) + API (create_case, extract, plan, audio, get_case, delete_case)
   + 90-day email reminders (EventBridge Scheduler, SES) + share-with-family email.
 
 Parameters:
@@ -140,7 +140,9 @@ Resources:
         AllowOrigins:
           - !Ref AllowedOrigin
           - !Ref DevOrigin
-        AllowMethods: [POST, GET, OPTIONS]
+        # DELETE is here for "Delete my case now" (D120): without it the
+        # browser's preflight refuses the request before it is ever sent.
+        AllowMethods: [POST, GET, DELETE, OPTIONS]
         AllowHeaders: [content-type]
       DefaultRouteSettings:
         ThrottlingBurstLimit: 20
@@ -307,6 +309,50 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${GetCaseFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: DELETE /cases/{caseId} -> erase the case now (D120).
+  # It deletes in one direction only: schedules, then objects, then the item.
+  # Hence GetItem (to find what exists), DeleteObject on both prefixes, and
+  # DeleteSchedule - but no Put, no Update and no ListBucket.
+  # ------------------------------------------------------------------
+  DeleteCaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.delete_case.lambda_handler
+      Timeout: 10
+      Environment:
+        Variables:
+          SCHEDULE_GROUP: !Ref ReminderScheduleGroup
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: s3:DeleteObject
+              Resource:
+                - !Sub "${EvidenceBucket.Arn}/uploads/*"
+                - !Sub "${EvidenceBucket.Arn}/packs/*"
+            - Effect: Allow
+              Action: scheduler:DeleteSchedule
+              Resource: !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${ReminderScheduleGroup}/*"
+      Events:
+        DeleteCase:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: DELETE
+            Path: /cases/{caseId}
+
+  DeleteCaseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DeleteCaseFunction}"
       RetentionInDays: 14
 
   # ------------------------------------------------------------------

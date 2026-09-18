@@ -31,13 +31,19 @@ def _response(status: int, body) -> dict:
     return common.json_response(status, body, headers=NO_STORE)
 
 
+# Why a step was not scheduled. Whitelisted rather than passed through: these
+# two are wording we have written for a victim to read, and a reason added
+# later would otherwise reach the screen as a raw internal string.
+SKIP_REASONS = ("deadline_passed", "case_expiring")
+
+
 def _reminders(item: dict):
     """The reminder cadence: what was scheduled and what has already been sent.
 
-    Deliberately partial - email, unsubToken, scheduleName, realDueDate, reason
-    and enrolledAt all stay in the table. The case ID is the only credential
-    this endpoint asks for, so anything returned here is readable by whoever
-    holds the link, and none of those has to be.
+    Deliberately partial - email, unsubToken, scheduleName, realDueDate and
+    enrolledAt all stay in the table. The case ID is the only credential this
+    endpoint asks for, so anything returned here is readable by whoever holds
+    the link, and none of those has to be.
     """
     reminders = item.get("reminders")
     if not reminders:
@@ -46,7 +52,8 @@ def _reminders(item: dict):
         "status": reminders.get("status"),
         "demo": bool(reminders.get("demo")),
         "steps": [{"step": s.get("step"), "fireAt": s.get("fireAt"),
-                   "status": s.get("status"), "sentAt": s.get("sentAt")}
+                   "status": s.get("status"), "sentAt": s.get("sentAt"),
+                   "reason": s.get("reason") if s.get("reason") in SKIP_REASONS else None}
                   for s in reminders.get("steps") or []],
     }
 
