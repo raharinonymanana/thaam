@@ -23,6 +23,15 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$")
 MAX_RETRY_ATTEMPTS = 3
 
 
+def _now():
+    """The one clock this handler reads (D113).
+
+    Every fire time and enrolledAt is derived from a single instant, so a
+    cadence cannot straddle two different "now"s - and a test can freeze it.
+    """
+    return datetime.now(timezone.utc)
+
+
 def _valid_email(value) -> bool:
     return (isinstance(value, str) and 0 < len(value) <= MAX_EMAIL
             and bool(_EMAIL.match(value.strip())))
@@ -85,7 +94,7 @@ def lambda_handler(event, context):
             "error": "no_plan", "message": "Build the plan before setting up reminders.",
         })
 
-    now = datetime.now(timezone.utc)
+    now = _now()
     expires_at = item.get("expiresAt")
     steps = reminder_steps.build_steps(
         clocks=item["clocks"],

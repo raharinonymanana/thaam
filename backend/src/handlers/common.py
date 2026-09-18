@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import decimal
 import hashlib
 import json
 import logging
@@ -65,11 +66,22 @@ def cases_table():
     return _clients["table"]
 
 
-def json_response(status: int, body) -> dict:
+def _json_default(value):
+    """DynamoDB hands numbers back as Decimal, which json cannot serialise.
+
+    Whole numbers (familySends, expiresAt) become ints so they read as numbers
+    in the response, not as "3.0" or a quoted string.
+    """
+    if isinstance(value, decimal.Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    raise TypeError(f"{type(value).__name__} is not JSON serialisable")
+
+
+def json_response(status: int, body, headers: dict | None = None) -> dict:
     return {
         "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
+        "headers": {"Content-Type": "application/json", **(headers or {})},
+        "body": json.dumps(body, default=_json_default),
     }
 
 

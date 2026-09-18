@@ -221,7 +221,10 @@ def run(args) -> int:
     print(f"      {saved['apiUrl']}/r/unsubscribe"
           "?c=<caseId from .last_case>&t=<token from the email>")
     if args.public_base_url:
-        print(f"case page: {args.public_base_url.rstrip('/')}/case/{saved['caseId']}")
+        # Same reasoning as the unsubscribe link above (D100): the case ID is a
+        # credential, so the placeholder is printed, never the value. The ID sits
+        # in the fragment (D111) so it never reaches an access log either.
+        print(f"case page: {args.public_base_url.rstrip('/')}/#case=<caseId from {LAST_CASE.name}>")
     print(f"PASS  all 5 steps ok  (caseRef {ref})")
     return 0
 

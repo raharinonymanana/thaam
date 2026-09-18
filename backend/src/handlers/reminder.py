@@ -14,7 +14,11 @@ API_BASE_URL = os.environ.get("API_BASE_URL", "").rstrip("/")
 
 
 def case_url(case_id: str) -> str:
-    return f"{PUBLIC_BASE_URL}/case/{case_id}"
+    # The case ID lives in the URL FRAGMENT (D111): a fragment is never sent to
+    # a server, so it stays out of Amplify's access logs, out of any CDN log and
+    # out of the Referer header the site would leak it in. The SPA reads it from
+    # location.hash and calls GET /cases/{caseId} itself.
+    return f"{PUBLIC_BASE_URL}/#case={case_id}"
 
 
 def unsubscribe_url(case_id: str, token: str) -> str:

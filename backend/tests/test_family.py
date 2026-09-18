@@ -53,7 +53,7 @@ def test_family_email_has_no_case_link_or_token():
     message = _render()
     for part in ("text", "html"):
         assert CASE_ID not in message[part]
-        assert "/case/" not in message[part]
+        assert "#case=" not in message[part]
         assert "unsubscribe" not in message[part].lower()
         assert "deadbeef" not in message[part]
         assert "<img" not in message[part]

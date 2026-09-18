@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Thaam - a companion for online-fraud victims in India.
-  Layers 1-4: storage (S3, DynamoDB) + API (create_case, extract, plan, audio)
+  Layers 1-4: storage (S3, DynamoDB) + API (create_case, extract, plan, audio, get_case)
   + 90-day email reminders (EventBridge Scheduler, SES) + share-with-family email.
 
 Parameters:
@@ -277,6 +277,36 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AudioFunction}"
+      RetentionInDays: 14
+
+  # ------------------------------------------------------------------
+  # Lambda: GET /cases/{caseId} -> the case again, read-only.
+  # Its own role with GetItem only: a read endpoint must not be able to
+  # write, even though PlanFunction already has this route's data.
+  # ------------------------------------------------------------------
+  GetCaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/src/
+      Handler: handlers.get_case.lambda_handler
+      Timeout: 5
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        GetCase:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ThaamApi
+            Method: GET
+            Path: /cases/{caseId}
+
+  GetCaseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${GetCaseFunction}"
       RetentionInDays: 14
 
   # ------------------------------------------------------------------

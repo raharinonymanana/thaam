@@ -201,6 +201,16 @@ def test_at_expression_is_utc_without_offset():
     assert reminder_steps.at_expression("2026-09-18T10:00:00+05:30") == "at(2026-09-18T04:30:00)"
 
 
+def test_case_link_keeps_the_case_id_in_the_fragment(monkeypatch):
+    # D111: a fragment never reaches a server, so the case ID stays out of the
+    # Amplify access log and out of the Referer header the page would send.
+    monkeypatch.setattr(reminder, "PUBLIC_BASE_URL", "https://site.example.com")
+    url = reminder.case_url(CASE_ID)
+    assert url == f"https://site.example.com/#case={CASE_ID}"
+    assert url.split("#")[0] == "https://site.example.com/"
+    assert CASE_ID not in url.split("#")[0]
+
+
 def test_schedule_name_uses_the_fingerprint_not_the_case_id():
     name = reminder_steps.schedule_name(REF, "bank_ack")
     assert name == f"thaam-{REF}-bank_ack"
@@ -218,7 +228,7 @@ SENSITIVE = ["49999", "49,999", "426173859012", "4261 7385 9012", "refund.help99
 def test_email_contains_no_sensitive_field(step):
     message = reminder_email.render(
         step=step, real_due_date="2026-09-19",
-        case_url=f"https://main.dhg3lzpzbimpz.amplifyapp.com/case/{CASE_ID}",
+        case_url=f"https://main.dhg3lzpzbimpz.amplifyapp.com/#case={CASE_ID}",
         unsubscribe_url=f"https://api.example.com/r/unsubscribe?c={CASE_ID}&t={TOKEN}",
     )
     for lang in ("text", "html"):
@@ -262,6 +272,11 @@ def aws(monkeypatch):
                         "arn:aws:iam::111122223333:role/thaam-SchedulerInvokeRole")
     monkeypatch.setattr(enroll, "ALLOW_DEMO_MODE", "false")
     monkeypatch.setattr(unsubscribe, "SCHEDULE_GROUP", "thaam-reminders")
+    # CLOCKS, EXPIRES_AT and every fire time asserted below were written for a
+    # case planned at NOW. Reading the wall clock instead would make the whole
+    # cadence drift: once a deadline passes, its step is skipped and the next
+    # one turns urgent, so these tests would start failing on their own (D113).
+    monkeypatch.setattr(enroll, "_now", lambda: NOW.astimezone(timezone.utc))
     return mocks
 
 
@@ -363,15 +378,13 @@ def test_demo_is_forbidden_when_disabled(aws):
 
 def test_demo_mode_fires_every_minute_when_enabled(aws, monkeypatch):
     monkeypatch.setattr(enroll, "ALLOW_DEMO_MODE", "true")
-    before = datetime.now(timezone.utc)
     resp, body = _enroll({"email": "victim@example.com", "demo": True})
     assert resp["statusCode"] == 201
 
     fire_times = [datetime.fromisoformat(s["fireAt"]) for s in body["steps"]]
-    offsets = [(t - before).total_seconds() for t in fire_times]
-    assert len(offsets) == 5
-    for i, offset in enumerate(offsets, start=1):
-        assert 60 * i - 5 <= offset <= 60 * i + 5
+    # The clock is frozen at NOW, so the offsets are exact, not approximate.
+    offsets = [(t - NOW).total_seconds() for t in fire_times]
+    assert offsets == [60.0, 120.0, 180.0, 240.0, 300.0]
     stored = aws["table"].update_item.call_args.kwargs["ExpressionAttributeValues"][":reminders"]
     assert stored["demo"] is True
     assert stored["steps"][0]["realDueDate"] == "2026-09-19"  # real date, not compressed
@@ -476,7 +489,8 @@ def test_reminder_sends_one_email(sending, caplog):
     assert sent["Destination"] == {"ToAddresses": ["victim@example.com"]}
     simple = sent["Content"]["Simple"]
     assert "19 September 2026" in simple["Body"]["Text"]["Data"]
-    assert f"https://site.example.com/case/{CASE_ID}" in simple["Body"]["Text"]["Data"]
+    # The case ID rides in the fragment, so it never reaches an access log (D111).
+    assert f"https://site.example.com/#case={CASE_ID}" in simple["Body"]["Text"]["Data"]
     assert (f"https://api.example.com/r/unsubscribe?c={CASE_ID}&t={TOKEN}"
             in simple["Body"]["Text"]["Data"])
     for part in ("Text", "Html"):
