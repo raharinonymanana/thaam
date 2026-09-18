@@ -94,6 +94,20 @@ export function getAudio(caseId, lang) {
   return request(`/cases/${caseId}/audio?lang=${encodeURIComponent(lang)}`);
 }
 
+/** Enrol this case for the 90-day reminder cadence. Re-enrolling replaces the
+ * schedules that were there, so this is safe to call again. */
+export function enrolReminders(caseId, { email, demo = false }) {
+  return request(`/cases/${caseId}/reminders`, { method: "POST", body: { email, demo } });
+}
+
+/** One email to one person, at most three per case. The helper gets the steps
+ * and the dates - never the case link, and never the money. */
+export function shareWithFamily(caseId, { email, toName }) {
+  const body = { email };
+  if (toName) body.toName = toName;
+  return request(`/cases/${caseId}/family`, { method: "POST", body });
+}
+
 // S3 answers a presigned POST with XML, not JSON.
 const S3_MESSAGES = {
   EntityTooLarge: "That image is too large. Please try a smaller screenshot.",

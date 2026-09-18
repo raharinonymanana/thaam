@@ -9,7 +9,9 @@ import { ErrorNotice, Notice } from "../components/Notice";
  * prints the case ID, not even in an error: it is the credential for this case,
  * and this page can end up on a screen someone else is looking at.
  */
-export default function Case({ busy, error, notFound, caseView, caseId, onRetry, onRestart }) {
+export default function Case({
+  busy, error, notFound, caseView, caseId, onRetry, onRestart, ...rest
+}) {
   if (busy) {
     return (
       <Screen title="Opening your case…">
@@ -49,7 +51,7 @@ export default function Case({ busy, error, notFound, caseView, caseId, onRetry,
   return (
     <Screen title="Your plan">
       <p className="lead">Your case, as you left it.</p>
-      <PlanView caseId={caseId} plan={caseView} />
+      <PlanView caseId={caseId} plan={caseView} onRestart={onRestart} {...rest} />
     </Screen>
   );
 }

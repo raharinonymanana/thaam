@@ -20,6 +20,9 @@ export function parseCaseHash(hash) {
  * replaceState, not a new history entry: Back should leave the app, not walk
  * the victim backwards through a flow whose earlier screens no longer apply.
  * It also fires no hashchange, so this cannot restart the app it just set up.
+ *
+ * The query string is carried over, so ?demo=1 (D112) survives being given a
+ * case - otherwise the demo controls would vanish the moment a plan is built.
  */
 export function setCaseHash(caseId) {
   const { pathname, search } = window.location;

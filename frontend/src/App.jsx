@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
-  ApiError, buildPlan, createCase, extract, getCase, uploadToS3, UNEXPECTED_MESSAGE,
+  ApiError, buildPlan, createCase, enrolReminders, extract, getCase,
+  shareWithFamily, uploadToS3, UNEXPECTED_MESSAGE,
 } from "./api";
 import { clearCaseHash, parseCaseHash, setCaseHash } from "./hash";
 import { DECODE_MESSAGE, ENCODE_MESSAGE, prepareImage, REJECT_MESSAGE } from "./image";
+import { isDemoMode } from "./reminders";
 import { initialState, planPayload, reducer } from "./state";
 import { validateFields } from "./validate";
 import Footer from "./components/Footer";
@@ -22,6 +24,8 @@ const FRIENDLY = new Set([REJECT_MESSAGE, DECODE_MESSAGE, ENCODE_MESSAGE]);
 
 const NO_PLAN_MESSAGE =
   "This case was never finished, so there is no plan to show. You can start again.";
+
+const DEMO_DISABLED_MESSAGE = "Demo timing is not enabled.";
 
 function notice(err) {
   if (err instanceof ApiError) return { message: err.message, code: err.code };
@@ -153,11 +157,59 @@ export default function App() {
     }
   }
 
+  async function enrol({ email, demo }) {
+    if (state.remindersUi.busy) return;
+    dispatch({ type: "reminders_submitting" });
+    try {
+      const result = await enrolReminders(state.caseId, { email, demo });
+      dispatch({ type: "reminders_enrolled", ...result, demo });
+    } catch (err) {
+      const error = err instanceof ApiError && err.code === "demo_disabled"
+        ? { message: DEMO_DISABLED_MESSAGE, code: err.code }
+        : notice(err);
+      dispatch({ type: "reminders_failed", error });
+    }
+  }
+
+  async function share({ email, toName }) {
+    if (state.familyUi.busy) return;
+    dispatch({ type: "family_submitting" });
+    try {
+      const result = await shareWithFamily(state.caseId, { email, toName });
+      dispatch({ type: "family_sent", sendsRemaining: result.sendsRemaining });
+    } catch (err) {
+      // 429 is the server's count, not ours, and it closes the form.
+      if (err instanceof ApiError && err.code === "limit_reached") {
+        dispatch({ type: "family_limit_reached" });
+      } else {
+        // 422 address_not_approved carries the sandbox explanation; show it
+        // exactly as the backend wrote it.
+        dispatch({ type: "family_failed", error: notice(err) });
+      }
+    }
+  }
+
   function restart() {
     requested.current = null;
+    // Keeps ?demo=1 (D112); only the case fragment goes.
     clearCaseHash();
     dispatch({ type: "restart" });
   }
+
+  // Everything the plan view needs, shown identically on both screens.
+  const planProps = {
+    reminders: state.reminders,
+    remindersUi: state.remindersUi,
+    family: state.family,
+    familyUi: state.familyUi,
+    demoMode: isDemoMode(window.location.search),
+    confirmRestart: state.confirmRestart,
+    onEnrol: enrol,
+    onShare: share,
+    onRestartRequest: () => dispatch({ type: "restart_requested" }),
+    onRestartCancel: () => dispatch({ type: "restart_cancelled" }),
+    onRestart: restart,
+  };
 
   return (
     <div className="app">
@@ -218,7 +270,7 @@ export default function App() {
         )}
 
         {state.screen === "plan" && (
-          <Plan caseId={state.caseId} plan={state.plan} />
+          <Plan caseId={state.caseId} plan={state.plan} {...planProps} />
         )}
 
         {state.screen === "case" && (
@@ -229,7 +281,7 @@ export default function App() {
             caseView={state.caseView}
             caseId={state.caseId}
             onRetry={() => loadCase(state.caseId)}
-            onRestart={restart}
+            {...planProps}
           />
         )}
       </main>

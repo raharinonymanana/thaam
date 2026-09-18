@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { ApiError, getAudio } from "../api";
 import { deadlineRows, ESTIMATED_NOTE, goldenHourLine } from "../format";
-import { Notice } from "../components/Notice";
+import { Notice } from "./Notice";
+import FamilySection from "./FamilySection";
+import RemindersSection from "./RemindersSection";
 
 // The plan, rendered once and used twice: straight after POST /plan, and again
 // when a victim comes back to GET /cases/{id} from a reminder email. Both
@@ -149,7 +151,33 @@ function Steps({ steps }) {
   );
 }
 
-export default function PlanView({ caseId, plan }) {
+/** D117: leaving is a deliberate act, and the confirm is inline rather than a
+ * window.confirm - a native dialog blocks the page, reads as a browser warning
+ * and cannot say the one thing that matters, which is that the current plan is
+ * not being destroyed. */
+function StartNewCase({ confirming, onRequest, onCancel, onConfirm }) {
+  if (!confirming) {
+    return (
+      <p className="start-new">
+        <button type="button" className="linkish" onClick={onRequest}>
+          Start a new case
+        </button>
+      </p>
+    );
+  }
+  return (
+    <div className="start-new confirm" role="group" aria-label="Start a new case">
+      <p>Start again? Your current plan stays at its link.</p>
+      <button type="button" className="button" onClick={onConfirm}>Yes, start again</button>
+      <button type="button" className="button button-quiet" onClick={onCancel}>Cancel</button>
+    </div>
+  );
+}
+
+export default function PlanView({
+  caseId, plan, reminders, remindersUi, family, familyUi, demoMode,
+  confirmRestart, onEnrol, onShare, onRestartRequest, onRestartCancel, onRestart,
+}) {
   if (!plan) return null;
 
   return (
@@ -175,18 +203,27 @@ export default function PlanView({ caseId, plan }) {
         </p>
       </section>
 
-      <section className="card soon">
-        <h2>Reminders</h2>
-        <p className="hint">Coming next.</p>
-        <h2>Share with family</h2>
-        <p className="hint">Coming next.</p>
-      </section>
+      <RemindersSection
+        reminders={reminders}
+        ui={remindersUi}
+        demoMode={demoMode}
+        onEnrol={onEnrol}
+      />
+
+      <FamilySection family={family} ui={familyUi} onShare={onShare} />
 
       {plan.disclaimers?.length > 0 && (
         <ul className="plan-disclaimers">
           {plan.disclaimers.map((line) => <li key={line}>{line}</li>)}
         </ul>
       )}
+
+      <StartNewCase
+        confirming={confirmRestart}
+        onRequest={onRestartRequest}
+        onCancel={onRestartCancel}
+        onConfirm={onRestart}
+      />
     </div>
   );
 }

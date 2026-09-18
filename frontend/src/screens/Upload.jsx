@@ -42,11 +42,12 @@ export default function Upload({ file, busy, error, onChoose, onSubmit }) {
         The SMS or UPI app screen that shows the money leaving your account.
       </p>
 
-      <label className="field">
+      <label className="field" htmlFor="screenshot">
         <span className="field-label">Screenshot</span>
         {/* accept= makes a phone offer the gallery and the camera rather than
             its whole file system. */}
         <input
+          id="screenshot"
           type="file"
           accept={ACCEPTED_TYPES.join(",")}
           onChange={choose}

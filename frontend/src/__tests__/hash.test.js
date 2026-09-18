@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCaseHash } from "../hash";
+import { clearCaseHash, parseCaseHash, setCaseHash } from "../hash";
 
 const VALID = "abcdefghijklmnopqrstuv";           // 22 chars, as the backend issues
 const WITH_SYMBOLS = "ab-def_hijklmnopqrstuv";      // - and _ are in the alphabet
@@ -34,5 +34,41 @@ describe("parseCaseHash", () => {
     for (const value of [null, undefined, 0, {}, [], true]) {
       expect(parseCaseHash(value)).toBeNull();
     }
+  });
+});
+
+describe("setCaseHash and clearCaseHash", () => {
+  function fakeWindow(pathname = "/", search = "") {
+    const calls = [];
+    globalThis.window = {
+      location: { pathname, search, hash: "" },
+      history: { replaceState: (_state, _title, url) => calls.push(url) },
+    };
+    return calls;
+  }
+
+  it("puts the case in the fragment", () => {
+    const calls = fakeWindow();
+    setCaseHash(VALID);
+    expect(calls).toEqual([`/#case=${VALID}`]);
+  });
+
+  it("keeps ?demo=1 so the demo controls survive being given a case (D112)", () => {
+    const calls = fakeWindow("/", "?demo=1");
+    setCaseHash(VALID);
+    expect(calls).toEqual([`/?demo=1#case=${VALID}`]);
+  });
+
+  it("keeps the whole query string, whatever is in it", () => {
+    const calls = fakeWindow("/thaam/", "?demo=1&lang=hi");
+    setCaseHash(VALID);
+    expect(calls).toEqual([`/thaam/?demo=1&lang=hi#case=${VALID}`]);
+  });
+
+  it("clearing drops only the fragment, never the query", () => {
+    const calls = fakeWindow("/", "?demo=1");
+    clearCaseHash();
+    expect(calls).toEqual(["/?demo=1"]);
+    expect(parseCaseHash(calls[0])).toBeNull();
   });
 });

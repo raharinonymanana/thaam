@@ -277,10 +277,15 @@ ul.plain li { margin-bottom: 0.35rem; }
 
 .field .hint { margin: 0 0 0.4rem; }
 
+/* Every text-like input the app renders. Fields.jsx picks text/tel/date/time
+   from its own table, and the two email inputs come from the reminder and
+   family forms; anything left out of this list falls back to the browser's
+   default box, which is a third the height and unreadable on a phone. */
 .field input[type="text"],
 .field input[type="tel"],
 .field input[type="date"],
-.field input[type="time"] {
+.field input[type="time"],
+.field input[type="email"] {
   display: block;
   width: 100%;
   min-height: var(--tap);
@@ -527,3 +532,65 @@ ul.plain li { margin-bottom: 0.35rem; }
 }
 
 .plan-disclaimers li { margin-bottom: 0.25rem; }
+
+/* ---------- reminders ---------- */
+
+.reminder-steps {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reminder-steps li {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.reminder-steps li:first-child { border-top: 0; }
+
+.reminder-label { margin: 0; font-weight: 600; }
+
+.reminder-status {
+  margin: 0;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.reminder-sent { color: var(--accent); font-weight: 650; }
+.reminder-soon { font-weight: 650; }
+.reminder-skipped { color: var(--ink-soft); white-space: normal; }
+.reminder-due { color: var(--ink-soft); }
+
+/* ---------- start a new case (D117) ---------- */
+
+.start-new {
+  margin: 1.5rem 0 0;
+  text-align: center;
+}
+
+.linkish {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.start-new.confirm {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  text-align: left;
+}
+
+.start-new.confirm p { margin: 0; }
+.start-new.confirm .button { margin-top: 0.75rem; }

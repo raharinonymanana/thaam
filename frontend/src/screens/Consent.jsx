@@ -27,8 +27,13 @@ export default function Consent({ consent, onToggle, onContinue }) {
         <li>It cannot tell you whether a message is a scam.</li>
       </ul>
 
-      <label className="check">
+      {/* id + htmlFor, not just nesting: with nesting alone a checkbox can end
+          up announced as "on" (its default value) instead of the sentence
+          beside it, which tells a screen-reader user nothing about what they
+          are agreeing to. */}
+      <label className="check" htmlFor="consent-agree">
         <input
+          id="consent-agree"
           type="checkbox"
           checked={consent}
           onChange={(event) => onToggle(event.target.checked)}

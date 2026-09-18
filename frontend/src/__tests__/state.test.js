@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countFound, FIELD_KEYS, initialState, pickFields, planPayload, reducer,
+  SHARE_LIMIT_MESSAGE,
 } from "../state";
 
 const FIELDS = {
@@ -270,6 +271,243 @@ describe("planPayload", () => {
     expect(payload.payee_phone).toBeNull();
     expect(payload.bank).toBe("Sample Bank");
     expect(payload.sender_id).toBeUndefined();
+  });
+});
+
+describe("reminders", () => {
+  const onPlan = run([
+    { type: "uploaded", caseId: CASE_ID },
+    { type: "extract_succeeded", fields: FIELDS },
+    { type: "fields_accepted" },
+    { type: "triage_answered", shared: "no" },
+    { type: "plan_succeeded", plan: { path: "unauthorised", clocks: {}, steps: [] } },
+  ]);
+
+  const ENROLLED = {
+    steps: [{ step: "liability_window", fireAt: "2026-09-23T10:00:00+05:30", urgent: false }],
+    skipped: [{ step: "bank_ack", reason: "deadline_passed" }],
+  };
+
+  it("starts with nothing enrolled and the full share budget", () => {
+    expect(onPlan.reminders).toBeNull();
+    expect(onPlan.family.sendsRemaining).toBe(3);
+    expect(onPlan.remindersUi).toEqual({ busy: false, error: null });
+  });
+
+  it("turns them on", () => {
+    const state = run([
+      { type: "reminders_submitting" },
+      { type: "reminders_enrolled", ...ENROLLED, demo: false },
+    ], onPlan);
+    expect(state.reminders.status).toBe("active");
+    expect(state.reminders.demo).toBe(false);
+    expect(state.reminders.steps.map((s) => s.step)).toEqual(["bank_ack", "liability_window"]);
+    expect(state.remindersUi).toEqual({ busy: false, error: null });
+  });
+
+  it("records demo timing when it was asked for", () => {
+    const state = reducer(onPlan, { type: "reminders_enrolled", ...ENROLLED, demo: true });
+    expect(state.reminders.demo).toBe(true);
+  });
+
+  it("marks the section busy and clears the last error while submitting", () => {
+    const failed = run([
+      { type: "reminders_submitting" },
+      { type: "reminders_failed", error: { message: "Demo timing is not enabled." } },
+    ], onPlan);
+    expect(failed.remindersUi.busy).toBe(false);
+    expect(failed.remindersUi.error.message).toBe("Demo timing is not enabled.");
+    expect(failed.reminders).toBeNull();
+
+    const retrying = reducer(failed, { type: "reminders_submitting" });
+    expect(retrying.remindersUi).toEqual({ busy: true, error: null });
+  });
+
+  it("a second attempt clears the previous attempt's error", () => {
+    const state = run([
+      { type: "reminders_submitting" },
+      { type: "reminders_failed", error: { message: "Demo timing is not enabled." } },
+      { type: "reminders_submitting" },
+      { type: "reminders_enrolled", ...ENROLLED, demo: false },
+    ], onPlan);
+    expect(state.remindersUi.error).toBeNull();
+    expect(state.reminders.status).toBe("active");
+  });
+
+  it("enrolling clears the error, so only the latest attempt is on screen", () => {
+    const failed = run([
+      { type: "reminders_submitting" },
+      { type: "reminders_failed", error: { message: "x" } },
+    ], onPlan);
+    const enrolled = reducer(failed, { type: "reminders_enrolled", ...ENROLLED });
+    expect(enrolled.remindersUi.error).toBeNull();
+  });
+
+  it("a failure never touches the plan itself", () => {
+    const state = reducer(onPlan, { type: "reminders_failed", error: { message: "x" } });
+    expect(state.screen).toBe("plan");
+    expect(state.plan).toEqual(onPlan.plan);
+    expect(state.error).toBeNull();
+  });
+
+  it("takes the cadence from a reopened case", () => {
+    const state = run([
+      { type: "case_requested", caseId: CASE_ID },
+      {
+        type: "case_loaded",
+        caseView: {
+          path: "unauthorised",
+          reminders: {
+            status: "active",
+            demo: false,
+            steps: [
+              { step: "closeout", fireAt: "2026-12-11T10:00:00+05:30", status: "scheduled",
+                sentAt: null },
+              { step: "bank_ack", fireAt: "2026-09-18T10:00:00+05:30", status: "scheduled",
+                sentAt: "2026-09-18T04:30:11+00:00" },
+            ],
+          },
+          family: { sendsRemaining: 1 },
+        },
+      },
+    ]);
+    expect(state.reminders.steps.map((s) => s.step)).toEqual(["bank_ack", "closeout"]);
+    expect(state.family.sendsRemaining).toBe(1);
+  });
+
+  it("a case that never enrolled has no cadence and the full budget", () => {
+    const state = run([
+      { type: "case_requested", caseId: CASE_ID },
+      { type: "case_loaded", caseView: { path: "unauthorised", reminders: null } },
+    ]);
+    expect(state.reminders).toBeNull();
+    expect(state.family.sendsRemaining).toBe(3);
+  });
+});
+
+describe("share with family", () => {
+  const onPlan = reducer(initialState, {
+    type: "plan_succeeded", plan: { path: "unauthorised" },
+  });
+
+  it("counts a send down, using the server's own number", () => {
+    const state = run([
+      { type: "family_submitting" },
+      { type: "family_sent", sendsRemaining: 2 },
+    ], onPlan);
+    expect(state.family).toEqual({ sendsRemaining: 2, sent: true });
+    expect(state.familyUi).toEqual({ busy: false, error: null });
+  });
+
+  it("decrements by one if the server did not say", () => {
+    expect(reducer(onPlan, { type: "family_sent" }).family.sendsRemaining).toBe(2);
+  });
+
+  it("shows a failure without spending a share", () => {
+    const state = run([
+      { type: "family_submitting" },
+      { type: "family_failed", error: { message: "We could not send to that address" } },
+    ], onPlan);
+    expect(state.family.sendsRemaining).toBe(3);
+    expect(state.family.sent).toBe(false);
+    expect(state.familyUi.error.message).toMatch(/could not send/);
+  });
+
+  it("closes the form when the server says the three are gone", () => {
+    const state = reducer(onPlan, { type: "family_limit_reached" });
+    expect(state.family.sendsRemaining).toBe(0);
+    expect(state.familyUi.error.message).toBe(SHARE_LIMIT_MESSAGE);
+    expect(SHARE_LIMIT_MESSAGE).toBe("You've used all 3 shares for this case.");
+  });
+
+  // A send that succeeded and a later one that failed were both on screen at
+  // once, so the victim could not tell which address had actually been mailed.
+  describe("only the latest attempt is shown", () => {
+    const sentOnce = run([
+      { type: "family_submitting" },
+      { type: "family_sent", sendsRemaining: 2 },
+    ], onPlan);
+
+    it("a second attempt clears the first one's success notice", () => {
+      expect(sentOnce.family.sent).toBe(true);
+      const again = reducer(sentOnce, { type: "family_submitting" });
+      expect(again.family.sent).toBe(false);
+      expect(again.familyUi).toEqual({ busy: true, error: null });
+    });
+
+    it("a rejected address never sits under a success notice", () => {
+      const state = run([
+        { type: "family_submitting" },
+        { type: "family_failed", error: { message: "We could not send to that address" } },
+      ], sentOnce);
+      expect(state.family.sent).toBe(false);
+      expect(state.familyUi.error.message).toMatch(/could not send/);
+      // The share that did go out is still counted.
+      expect(state.family.sendsRemaining).toBe(2);
+    });
+
+    it("running out of shares clears the success notice too", () => {
+      const state = reducer(sentOnce, { type: "family_limit_reached" });
+      expect(state.family.sent).toBe(false);
+      expect(state.family.sendsRemaining).toBe(0);
+      expect(state.familyUi.error.message).toBe(SHARE_LIMIT_MESSAGE);
+    });
+
+    it("a success clears the previous attempt's error", () => {
+      const state = run([
+        { type: "family_submitting" },
+        { type: "family_failed", error: { message: "nope" } },
+        { type: "family_submitting" },
+        { type: "family_sent", sendsRemaining: 1 },
+      ], onPlan);
+      expect(state.familyUi.error).toBeNull();
+      expect(state.family.sent).toBe(true);
+    });
+
+    it("never shows a success and an error at the same time", () => {
+      const attempts = [
+        [{ type: "family_submitting" }, { type: "family_sent", sendsRemaining: 2 }],
+        [{ type: "family_submitting" }, { type: "family_failed", error: { message: "x" } }],
+        [{ type: "family_submitting" }, { type: "family_limit_reached" }],
+      ];
+      let state = onPlan;
+      for (const actions of attempts) {
+        state = run(actions, state);
+        expect(state.family.sent && state.familyUi.error).toBeFalsy();
+      }
+    });
+  });
+});
+
+describe("start a new case (D117)", () => {
+  const onPlan = run([
+    { type: "uploaded", caseId: CASE_ID },
+    { type: "extract_succeeded", fields: FIELDS },
+    { type: "plan_succeeded", plan: { path: "unauthorised" } },
+  ]);
+
+  it("asks before it does anything", () => {
+    const asking = reducer(onPlan, { type: "restart_requested" });
+    expect(asking.confirmRestart).toBe(true);
+    // Nothing else moved: the plan is still there behind the question.
+    expect(asking.screen).toBe("plan");
+    expect(asking.plan).toEqual(onPlan.plan);
+    expect(asking.caseId).toBe(CASE_ID);
+  });
+
+  it("cancelling leaves the plan exactly as it was", () => {
+    const state = run([{ type: "restart_requested" }, { type: "restart_cancelled" }], onPlan);
+    expect(state).toEqual(onPlan);
+  });
+
+  it("confirming goes back to consent with nothing carried over", () => {
+    const state = run([{ type: "restart_requested" }, { type: "restart" }], onPlan);
+    expect(state).toEqual(initialState);
+    expect(state.screen).toBe("consent");
+    expect(state.caseId).toBeNull();
+    expect(state.plan).toBeNull();
+    expect(state.reminders).toBeNull();
+    expect(state.confirmRestart).toBe(false);
   });
 });
 

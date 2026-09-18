@@ -21,12 +21,17 @@ export default function Triage({ shared, busy, error, onAnswer, onSubmit, onBack
 
       <fieldset className="options">
         <legend className="sr-only">Your answer</legend>
+        {/* id + htmlFor, not just nesting: without it these are announced as
+            "yes", "no" and "not_sure" - the wire values - instead of the
+            sentences the victim is actually choosing between. */}
         {OPTIONS.map((option) => (
           <label
             key={option.value}
+            htmlFor={`triage-${option.value}`}
             className={`option${shared === option.value ? " option-on" : ""}`}
           >
             <input
+              id={`triage-${option.value}`}
               type="radio"
               name="sharedCredentials"
               value={option.value}

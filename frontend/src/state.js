@@ -6,6 +6,8 @@
 // sessionStorage, because it is the only credential the case has, and a shared
 // or borrowed phone must not keep it after the tab closes.
 
+import { FAMILY_MAX_SENDS, fromCase, fromEnrolment } from "./reminders";
+
 export const SCREENS = ["consent", "upload", "extracting", "fields", "triage", "plan", "case"];
 
 // The eight details the plan is built from. sender_id, direction and missing
@@ -18,6 +20,8 @@ export const FIELD_KEYS = [
 export const REQUIRED_KEYS = ["amount", "txn_date"];
 
 export const SHARED_ANSWERS = ["yes", "no", "not_sure"];
+
+export const SHARE_LIMIT_MESSAGE = `You've used all ${FAMILY_MAX_SENDS} shares for this case.`;
 
 export const initialState = {
   screen: "consent",
@@ -35,6 +39,17 @@ export const initialState = {
   plan: null,
   caseView: null,
   notFound: false,
+
+  // The plan's two follow-on actions. Both live here rather than inside the
+  // plan view, because a re-opened case arrives already enrolled and already
+  // part-way through its three shares: the screen has to be told, not guess.
+  reminders: null,
+  remindersUi: { busy: false, error: null },
+  // A freshly built plan has sent nothing yet. The server counts for real and
+  // answers 429 when this drifts, so it is a starting point, not a rule.
+  family: { sendsRemaining: FAMILY_MAX_SENDS, sent: false },
+  familyUi: { busy: false, error: null },
+  confirmRestart: false,
 };
 
 function hasText(value) {
@@ -185,7 +200,75 @@ export function reducer(state, action) {
       };
 
     case "case_loaded":
-      return { ...state, screen: "case", busy: false, error: null, caseView: action.caseView };
+      return {
+        ...state,
+        screen: "case",
+        busy: false,
+        error: null,
+        caseView: action.caseView,
+        reminders: fromCase(action.caseView?.reminders),
+        family: {
+          sendsRemaining: action.caseView?.family?.sendsRemaining ?? FAMILY_MAX_SENDS,
+          sent: false,
+        },
+      };
+
+    case "reminders_submitting":
+      return { ...state, remindersUi: { busy: true, error: null } };
+
+    case "reminders_enrolled":
+      return {
+        ...state,
+        reminders: fromEnrolment(action, action.demo === true),
+        remindersUi: { busy: false, error: null },
+      };
+
+    case "reminders_failed":
+      return { ...state, remindersUi: { busy: false, error: action.error ?? null } };
+
+    case "family_submitting":
+      // Clear the last result before trying again. "Sent to them ✓" left
+      // standing above a failure reads as though both happened, and the
+      // victim has no way to tell which address actually got the email.
+      return {
+        ...state,
+        family: { ...state.family, sent: false },
+        familyUi: { busy: true, error: null },
+      };
+
+    case "family_sent":
+      return {
+        ...state,
+        family: {
+          sendsRemaining: action.sendsRemaining ?? Math.max(state.family.sendsRemaining - 1, 0),
+          sent: true,
+        },
+        familyUi: { busy: false, error: null },
+      };
+
+    case "family_failed":
+      // sent is already false (family_submitting cleared it); saying so here
+      // too means an out-of-order dispatch cannot leave both showing.
+      return {
+        ...state,
+        family: { ...state.family, sent: false },
+        familyUi: { busy: false, error: action.error ?? null },
+      };
+
+    case "family_limit_reached":
+      // The server is the authority on the count: when it says the three are
+      // gone, the form goes away rather than inviting a fourth attempt.
+      return {
+        ...state,
+        family: { sendsRemaining: 0, sent: false },
+        familyUi: { busy: false, error: { message: SHARE_LIMIT_MESSAGE, code: "limit_reached" } },
+      };
+
+    case "restart_requested":
+      return { ...state, confirmRestart: true };
+
+    case "restart_cancelled":
+      return { ...state, confirmRestart: false };
 
     case "case_not_found":
       return { ...state, screen: "case", busy: false, error: null, notFound: true, caseView: null };
