@@ -15,6 +15,17 @@ export function parseCaseHash(hash) {
   return CASE_HASH.exec(hash)?.[1] ?? null;
 }
 
+/** Put the case in the address bar once there is a plan to come back to.
+ *
+ * replaceState, not a new history entry: Back should leave the app, not walk
+ * the victim backwards through a flow whose earlier screens no longer apply.
+ * It also fires no hashchange, so this cannot restart the app it just set up.
+ */
+export function setCaseHash(caseId) {
+  const { pathname, search } = window.location;
+  window.history.replaceState(null, "", `${pathname}${search}#case=${caseId}`);
+}
+
 /** Drop the fragment without reloading, so a "start again" cannot walk back
  * into a case that has expired - and so the ID leaves the address bar. */
 export function clearCaseHash() {

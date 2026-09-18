@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
-  ApiError, createCase, extract, getCase, uploadToS3, UNEXPECTED_MESSAGE,
+  ApiError, buildPlan, createCase, extract, getCase, uploadToS3, UNEXPECTED_MESSAGE,
 } from "./api";
-import { clearCaseHash, parseCaseHash } from "./hash";
+import { clearCaseHash, parseCaseHash, setCaseHash } from "./hash";
 import { DECODE_MESSAGE, ENCODE_MESSAGE, prepareImage, REJECT_MESSAGE } from "./image";
-import { initialState, reducer } from "./state";
+import { initialState, planPayload, reducer } from "./state";
+import { validateFields } from "./validate";
 import Footer from "./components/Footer";
 import Case from "./screens/Case";
 import Consent from "./screens/Consent";
 import Extracting from "./screens/Extracting";
 import Fields from "./screens/Fields";
+import Plan from "./screens/Plan";
+import Triage from "./screens/Triage";
 import Upload from "./screens/Upload";
 
 // Messages we wrote for a victim to read. Anything else - a TypeError, a
@@ -36,8 +39,12 @@ function start() {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, undefined, start);
   const requested = useRef(null);
+  const latest = useRef(state);
+
+  useEffect(() => { latest.current = state; });
 
   const loadCase = useCallback(async (caseId) => {
+    requested.current = caseId;
     dispatch({ type: "case_requested", caseId });
     try {
       dispatch({ type: "case_loaded", caseView: await getCase(caseId) });
@@ -59,9 +66,24 @@ export default function App() {
   useEffect(() => {
     if (state.screen !== "case" || !state.caseId) return;
     if (requested.current === state.caseId) return;
-    requested.current = state.caseId;
     loadCase(state.caseId);
   }, [state.screen, state.caseId, loadCase]);
+
+  // Someone can paste another case link, or edit the fragment away, without
+  // the page reloading. Both have to be honoured: the first opens that case,
+  // the second means "I am done with this one".
+  useEffect(() => {
+    function onHashChange() {
+      const next = parseCaseHash(window.location.hash);
+      if (next) {
+        if (next !== latest.current.caseId) loadCase(next);
+      } else if (latest.current.screen === "case") {
+        dispatch({ type: "restart" });
+      }
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [loadCase]);
 
   const runExtract = useCallback(async (caseId) => {
     dispatch({ type: "extract_started" });
@@ -96,6 +118,39 @@ export default function App() {
     }
     dispatch({ type: "uploaded", caseId });
     await runExtract(caseId);
+  }
+
+  function handleFieldsContinue() {
+    const { errors, focus, ok } = validateFields(state.fields);
+    if (!ok) {
+      dispatch({ type: "fields_invalid", errors, focus });
+      return;
+    }
+    dispatch({ type: "fields_accepted" });
+  }
+
+  async function submitPlan() {
+    if (state.busy || !state.shared) return;
+    dispatch({ type: "submit_started" });
+    try {
+      const plan = await buildPlan(state.caseId, {
+        fields: planPayload(state.fields),
+        sharedCredentials: state.shared,
+      });
+      // From here the case is worth coming back to, so it goes in the address
+      // bar - in the fragment, which never reaches a server (D111).
+      setCaseHash(state.caseId);
+      requested.current = state.caseId;
+      dispatch({ type: "plan_succeeded", plan });
+    } catch (err) {
+      // The server checks the eight fields again and is the authority. When it
+      // names one, the victim goes back to that field with its wording.
+      if (err instanceof ApiError && err.code === "invalid_field" && err.field) {
+        dispatch({ type: "plan_rejected_field", field: err.field, message: err.message });
+      } else {
+        dispatch({ type: "submit_failed", error: notice(err) });
+      }
+    }
   }
 
   function restart() {
@@ -139,7 +194,31 @@ export default function App() {
         )}
 
         {state.screen === "fields" && (
-          <Fields fields={state.fields} unreadable={state.unreadable} />
+          <Fields
+            fields={state.fields}
+            fieldErrors={state.fieldErrors}
+            focusField={state.focusField}
+            missingFields={state.missingFields}
+            unreadable={state.unreadable}
+            busy={state.busy}
+            onChange={(key, value) => dispatch({ type: "field_changed", key, value })}
+            onContinue={handleFieldsContinue}
+          />
+        )}
+
+        {state.screen === "triage" && (
+          <Triage
+            shared={state.shared}
+            busy={state.busy}
+            error={state.error}
+            onAnswer={(shared) => dispatch({ type: "triage_answered", shared })}
+            onSubmit={submitPlan}
+            onBack={() => dispatch({ type: "back_to_fields" })}
+          />
+        )}
+
+        {state.screen === "plan" && (
+          <Plan caseId={state.caseId} plan={state.plan} />
         )}
 
         {state.screen === "case" && (
@@ -148,6 +227,7 @@ export default function App() {
             error={state.error}
             notFound={state.notFound}
             caseView={state.caseView}
+            caseId={state.caseId}
             onRetry={() => loadCase(state.caseId)}
             onRestart={restart}
           />

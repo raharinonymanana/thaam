@@ -6,7 +6,7 @@
 // sessionStorage, because it is the only credential the case has, and a shared
 // or borrowed phone must not keep it after the tab closes.
 
-export const SCREENS = ["consent", "upload", "extracting", "fields", "case"];
+export const SCREENS = ["consent", "upload", "extracting", "fields", "triage", "plan", "case"];
 
 // The eight details the plan is built from. sender_id, direction and missing
 // come back from extract too, but they are not fields the victim confirms.
@@ -14,6 +14,10 @@ export const FIELD_KEYS = [
   "amount", "utr", "txn_date", "txn_time",
   "account_masked", "payee_vpa", "payee_phone", "bank",
 ];
+
+export const REQUIRED_KEYS = ["amount", "txn_date"];
+
+export const SHARED_ANSWERS = ["yes", "no", "not_sure"];
 
 export const initialState = {
   screen: "consent",
@@ -23,26 +27,54 @@ export const initialState = {
   busy: false,
   error: null,
   fields: null,
+  fieldErrors: {},
+  focusField: null,
+  missingFields: [],
   unreadable: false,
+  shared: null,
+  plan: null,
   caseView: null,
   notFound: false,
 };
 
+function hasText(value) {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 /** How many of the eight details Textract actually found. */
 export function countFound(fields) {
   if (!fields) return 0;
-  return FIELD_KEYS.filter((key) => {
-    const value = fields[key];
-    return typeof value === "string" && value.trim() !== "";
-  }).length;
+  return FIELD_KEYS.filter((key) => hasText(fields[key])).length;
 }
 
-/** The eight keys only, each present, missing ones as null. */
+/** The eight keys only, each present, missing ones as empty text so they can
+ * go straight into an input without React complaining about null values. */
 export function pickFields(fields) {
-  return Object.fromEntries(FIELD_KEYS.map((key) => [key, fields?.[key] ?? null]));
+  return Object.fromEntries(
+    FIELD_KEYS.map((key) => [key, hasText(fields?.[key]) ? fields[key].trim() : ""]),
+  );
+}
+
+/** The keys extract could not fill, remembered so the form can mark them even
+ * after the victim starts typing into the others. */
+export function missingKeys(fields) {
+  return FIELD_KEYS.filter((key) => !hasText(fields?.[key]));
+}
+
+/** Empty text becomes null on the wire: the backend treats both the same, and
+ * null says "not known" more plainly than "". */
+export function planPayload(fields) {
+  return Object.fromEntries(
+    FIELD_KEYS.map((key) => [key, hasText(fields?.[key]) ? fields[key].trim() : null]),
+  );
 }
 
 const EMPTY_FIELDS = pickFields(null);
+
+function withoutField(errors, key) {
+  const { [key]: _dropped, ...rest } = errors;
+  return rest;
+}
 
 export function reducer(state, action) {
   switch (action.type) {
@@ -78,6 +110,9 @@ export function reducer(state, action) {
         error: null,
         unreadable: false,
         fields: pickFields(action.fields),
+        missingFields: missingKeys(action.fields),
+        fieldErrors: {},
+        focusField: null,
       };
 
     case "extract_unreadable":
@@ -90,7 +125,54 @@ export function reducer(state, action) {
         error: null,
         unreadable: true,
         fields: EMPTY_FIELDS,
+        missingFields: [...FIELD_KEYS],
+        fieldErrors: {},
+        focusField: null,
       };
+
+    case "field_changed":
+      // Typing into a field clears its complaint: nothing is more irritating
+      // than an error that stays on screen after it has been fixed.
+      return {
+        ...state,
+        fields: { ...state.fields, [action.key]: action.value },
+        fieldErrors: withoutField(state.fieldErrors, action.key),
+        focusField: null,
+      };
+
+    case "fields_invalid":
+      return {
+        ...state,
+        screen: "fields",
+        busy: false,
+        fieldErrors: action.errors ?? {},
+        focusField: action.focus ?? null,
+      };
+
+    case "fields_accepted":
+      return { ...state, screen: "triage", error: null, fieldErrors: {}, focusField: null };
+
+    case "triage_answered":
+      if (!SHARED_ANSWERS.includes(action.shared)) return state;
+      return { ...state, shared: action.shared, error: null };
+
+    case "back_to_fields":
+      return { ...state, screen: "fields", busy: false, error: null, focusField: null };
+
+    case "plan_rejected_field":
+      // The server found something we let through. Its wording wins, and the
+      // victim is taken back to the field it is about.
+      return {
+        ...state,
+        screen: "fields",
+        busy: false,
+        error: null,
+        fieldErrors: { ...state.fieldErrors, [action.field]: action.message },
+        focusField: action.field,
+      };
+
+    case "plan_succeeded":
+      return { ...state, screen: "plan", busy: false, error: null, plan: action.plan };
 
     case "case_requested":
       return {

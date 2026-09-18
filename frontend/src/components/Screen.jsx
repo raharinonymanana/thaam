@@ -6,12 +6,17 @@ import { useEffect, useRef } from "react";
  * reader and a keyboard both stay wherever the last button was, so someone who
  * cannot see the change is never told the app moved on - and the app has no
  * router, so nothing else announces it.
+ *
+ * focusHeading is turned off when the screen has somewhere better to send the
+ * cursor, such as the field the server has just rejected.
  */
-export default function Screen({ title, children }) {
+export default function Screen({ title, focusHeading = true, children }) {
   const heading = useRef(null);
 
   useEffect(() => {
-    heading.current?.focus();
+    if (focusHeading) heading.current?.focus();
+    // Only on arrival: a later re-render must not yank focus out of an input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

@@ -97,10 +97,12 @@ main { flex: 1; }
   font-weight: 650;
 }
 
-/* The heading takes focus on every transition; it is not a control, so it gets
-   a focus ring but no pointer styling. */
-.screen-title:focus-visible,
-.screen-title:focus {
+/* The heading is focused programmatically on every transition. A ring around
+   it after a tap looks like a bug, so it only shows for keyboard focus - while
+   every real control keeps its ring always. */
+.screen-title:focus { outline: none; }
+
+.screen-title:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
   border-radius: 4px;
@@ -182,14 +184,6 @@ ul.plain li { margin-bottom: 0.35rem; }
   accent-color: var(--accent);
 }
 
-.field { display: block; margin-top: 1rem; }
-
-.field-label {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-weight: 600;
-}
-
 .field input[type="file"] {
   display: block;
   width: 100%;
@@ -268,3 +262,268 @@ ul.plain li { margin-bottom: 0.35rem; }
 }
 
 .footer li { margin-bottom: 0.25rem; }
+
+/* ---------- the eight fields ---------- */
+
+.field { margin-top: 1.5rem; }
+
+.field-label {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-weight: 650;
+}
+
+.req { font-weight: 400; color: var(--ink-soft); }
+
+.field .hint { margin: 0 0 0.4rem; }
+
+.field input[type="text"],
+.field input[type="tel"],
+.field input[type="date"],
+.field input[type="time"] {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+
+.field-bad input { border-color: var(--error-line); border-width: 2px; }
+
+.field-error {
+  margin: 0.4rem 0 0;
+  color: var(--error-line);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.missing {
+  margin: 0.4rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+/* The XX is ours, not something to be typed over. */
+.input-prefixed {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.field-bad .input-prefixed { border-color: var(--error-line); border-width: 2px; }
+
+.input-prefixed .prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.15rem 0 0.75rem;
+  color: var(--ink-soft);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+}
+
+.input-prefixed input {
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding-left: 0.15rem !important;
+}
+
+/* ---------- triage ---------- */
+
+.question { font-size: 1.1rem; }
+
+.options {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.option {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 1rem 0.9rem;
+  min-height: 60px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.option-on {
+  border-color: var(--accent);
+  border-width: 2px;
+  background: var(--info-bg);
+}
+
+.option input {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.reassure { margin-top: 0.5rem; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- plan ---------- */
+
+.plan { margin-top: 0.5rem; }
+
+.card {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.card h2 { margin-top: 0; }
+
+.card + .card { margin-top: 1rem; }
+
+.call-now { border-color: var(--accent); border-width: 2px; }
+
+.button-call {
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  line-height: 1.6;
+}
+
+.golden {
+  margin: 0.75rem 0 0;
+  font-weight: 650;
+}
+
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+
+.tab {
+  min-height: var(--tap);
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.script {
+  margin: 0 0 1rem;
+  padding: 0.9rem;
+  border-radius: var(--radius);
+  background: var(--info-bg);
+  font-size: 1.15rem;
+  line-height: 1.7;
+}
+
+.script[lang="hi"] { font-size: 1.2rem; line-height: 1.85; }
+
+.player { display: block; width: 100%; margin-top: 0.75rem; }
+
+.deadlines, .steps { margin: 0; padding-left: 0; list-style: none; }
+
+.deadlines li {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.deadlines li:first-child { border-top: 0; padding-top: 0; }
+
+.deadline-label { margin: 0; font-weight: 600; }
+
+.deadline-date { margin: 0.15rem 0 0; font-size: 1.05rem; font-weight: 700; }
+
+.deadline-note {
+  margin: 0.1rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.steps { counter-reset: step; }
+
+.steps li {
+  position: relative;
+  counter-increment: step;
+  padding: 0.75rem 0 0.75rem 2.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.steps li:first-child { border-top: 0; }
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0.8rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--info-bg);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.6rem;
+}
+
+.step-title { margin: 0; font-weight: 700; }
+
+.step-detail { margin: 0.15rem 0 0; }
+
+.step-link,
+.deadlines a {
+  display: inline-block;
+  margin-top: 0.4rem;
+  min-height: 44px;
+  line-height: 44px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.soon h2:not(:first-child) { margin-top: 1.25rem; }
+
+.plan-disclaimers {
+  margin: 1.25rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.plan-disclaimers li { margin-bottom: 0.25rem; }

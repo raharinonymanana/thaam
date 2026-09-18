@@ -1,13 +1,15 @@
 import Screen from "../components/Screen";
+import PlanView from "../components/PlanView";
 import { ErrorNotice, Notice } from "../components/Notice";
 
 /** The screen a reminder email leads back to.
  *
- * STUB - task 4d renders the real plan. Nothing here prints the case ID, not
- * even in an error: it is the credential for this case, and this page can end
- * up on a screen someone else is looking at.
+ * The plan itself is rendered by the same component the post-/plan screen uses,
+ * so a returning victim sees exactly what they saw the first time. Nothing here
+ * prints the case ID, not even in an error: it is the credential for this case,
+ * and this page can end up on a screen someone else is looking at.
  */
-export default function Case({ busy, error, notFound, caseView, onRetry, onRestart }) {
+export default function Case({ busy, error, notFound, caseView, caseId, onRetry, onRestart }) {
   if (busy) {
     return (
       <Screen title="Opening your case…">
@@ -45,16 +47,9 @@ export default function Case({ busy, error, notFound, caseView, onRetry, onResta
   }
 
   return (
-    <Screen title="Your case">
-      <Notice kind="info">Your case — plan loads here (4d).</Notice>
-      {caseView && (
-        <p className="lead">
-          Opened on the {caseView.path === "authorised" ? "authorised" : "unauthorised"} path.
-        </p>
-      )}
-      <button type="button" className="button button-quiet" onClick={onRestart}>
-        Start again
-      </button>
+    <Screen title="Your plan">
+      <p className="lead">Your case, as you left it.</p>
+      <PlanView caseId={caseId} plan={caseView} />
     </Screen>
   );
 }

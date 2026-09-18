@@ -81,6 +81,19 @@ export function getCase(caseId) {
   return request(`/cases/${caseId}`);
 }
 
+export function buildPlan(caseId, { fields, sharedCredentials }) {
+  return request(`/cases/${caseId}/plan`, {
+    method: "POST",
+    body: { fields, sharedCredentials },
+  });
+}
+
+/** A presigned URL for the spoken script. It expires in ten minutes, so it is
+ * fetched when the victim presses Listen and never held in state beyond that. */
+export function getAudio(caseId, lang) {
+  return request(`/cases/${caseId}/audio?lang=${encodeURIComponent(lang)}`);
+}
+
 // S3 answers a presigned POST with XML, not JSON.
 const S3_MESSAGES = {
   EntityTooLarge: "That image is too large. Please try a smaller screenshot.",

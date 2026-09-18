@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { countFound, FIELD_KEYS, initialState, reducer } from "../state";
+import {
+  countFound, FIELD_KEYS, initialState, pickFields, planPayload, reducer,
+} from "../state";
 
 const FIELDS = {
   amount: "49999.00",
@@ -105,7 +107,8 @@ describe("upload and extract", () => {
     expect(state.unreadable).toBe(false);
     expect(Object.keys(state.fields)).toEqual(FIELD_KEYS);
     expect(state.fields.sender_id).toBeUndefined();
-    expect(state.fields.payee_phone).toBeNull();
+    // Empty text, not null: these values go straight into controlled inputs.
+    expect(state.fields.payee_phone).toBe("");
   });
 
   it("treats an unreadable image as a normal step forward, not an error", () => {
@@ -117,7 +120,7 @@ describe("upload and extract", () => {
     expect(state.unreadable).toBe(true);
     expect(state.error).toBeNull();
     expect(state.caseId).toBe(CASE_ID);
-    expect(Object.values(state.fields).every((value) => value === null)).toBe(true);
+    expect(Object.values(state.fields).every((value) => value === "")).toBe(true);
   });
 
   it("a retry after a failed extract clears the error", () => {
@@ -162,6 +165,111 @@ describe("returning victim", () => {
     ]);
     expect(state).toEqual(initialState);
     expect(state.caseId).toBeNull();
+  });
+});
+
+describe("fields, triage and the plan", () => {
+  const onFields = run([
+    { type: "uploaded", caseId: CASE_ID },
+    { type: "extract_succeeded", fields: FIELDS },
+  ]);
+
+  it("remembers which details extract could not find", () => {
+    expect(onFields.missingFields).toEqual(["payee_phone"]);
+    expect(onFields.fields.payee_phone).toBe("");
+    expect(onFields.fields.amount).toBe("49999.00");
+  });
+
+  it("marks every field missing when the image was unreadable", () => {
+    const state = run([{ type: "extract_unreadable" }], onFields);
+    expect(state.missingFields).toEqual(FIELD_KEYS);
+  });
+
+  it("typing clears that field's error and nothing else", () => {
+    const withErrors = reducer(onFields, {
+      type: "fields_invalid",
+      errors: { amount: "bad amount", utr: "bad utr" },
+      focus: "amount",
+    });
+    expect(withErrors.screen).toBe("fields");
+    expect(withErrors.focusField).toBe("amount");
+
+    const typed = reducer(withErrors, { type: "field_changed", key: "amount", value: "250" });
+    expect(typed.fields.amount).toBe("250");
+    expect(typed.fieldErrors).toEqual({ utr: "bad utr" });
+    expect(typed.focusField).toBeNull();
+  });
+
+  it("goes to triage once the fields are accepted", () => {
+    const state = reducer(onFields, { type: "fields_accepted" });
+    expect(state.screen).toBe("triage");
+    expect(state.fieldErrors).toEqual({});
+    expect(state.focusField).toBeNull();
+  });
+
+  it("records the triage answer and refuses anything else", () => {
+    const triage = reducer(onFields, { type: "fields_accepted" });
+    expect(reducer(triage, { type: "triage_answered", shared: "not_sure" }).shared).toBe("not_sure");
+    expect(reducer(triage, { type: "triage_answered", shared: "yes" }).shared).toBe("yes");
+    expect(reducer(triage, { type: "triage_answered", shared: "maybe" })).toBe(triage);
+    expect(reducer(triage, { type: "triage_answered", shared: null })).toBe(triage);
+  });
+
+  it("goes back to the fields from triage", () => {
+    const state = run([{ type: "fields_accepted" }, { type: "back_to_fields" }], onFields);
+    expect(state.screen).toBe("fields");
+    expect(state.fields).toEqual(onFields.fields);
+  });
+
+  it("shows the plan once it is built", () => {
+    const plan = { caseId: CASE_ID, path: "unauthorised", notSure: true, clocks: {}, steps: [] };
+    const state = run([
+      { type: "fields_accepted" },
+      { type: "triage_answered", shared: "not_sure" },
+      { type: "submit_started" },
+      { type: "plan_succeeded", plan },
+    ], onFields);
+    expect(state.screen).toBe("plan");
+    expect(state.busy).toBe(false);
+    expect(state.plan).toBe(plan);
+    expect(state.caseId).toBe(CASE_ID);
+  });
+
+  it("a rejected field sends the victim back to that field", () => {
+    const state = run([
+      { type: "fields_accepted" },
+      { type: "triage_answered", shared: "no" },
+      { type: "submit_started" },
+      {
+        type: "plan_rejected_field",
+        field: "account_masked",
+        message: "Enter only the last 4 digits of the account, e.g. XX1234.",
+      },
+    ], onFields);
+    expect(state.screen).toBe("fields");
+    expect(state.busy).toBe(false);
+    expect(state.error).toBeNull();
+    expect(state.focusField).toBe("account_masked");
+    expect(state.fieldErrors.account_masked).toMatch(/last 4 digits/);
+    // The answer survives, so the victim is not asked the triage question twice.
+    expect(state.shared).toBe("no");
+  });
+
+  it("keeps the typed values when the server rejects one of them", () => {
+    const typed = reducer(onFields, { type: "field_changed", key: "bank", value: "Sample Bank" });
+    const state = reducer(typed, { type: "plan_rejected_field", field: "utr", message: "x" });
+    expect(state.fields.bank).toBe("Sample Bank");
+    expect(state.fields.amount).toBe("49999.00");
+  });
+});
+
+describe("planPayload", () => {
+  it("sends the eight keys, with empty text as null", () => {
+    const payload = planPayload({ ...pickFields(FIELDS), bank: "  Sample Bank  " });
+    expect(Object.keys(payload)).toEqual(FIELD_KEYS);
+    expect(payload.payee_phone).toBeNull();
+    expect(payload.bank).toBe("Sample Bank");
+    expect(payload.sender_id).toBeUndefined();
   });
 });
 
