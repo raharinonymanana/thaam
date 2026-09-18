@@ -4,7 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <!-- The case ID travels in the URL fragment (D111). A fragment is never sent
+         to a server, but a Referer header would carry the whole URL to any
+         third-party request, so referrers are switched off entirely. -->
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="Thaam helps you take the right steps in the first hours after an online payment fraud in India." />
+    <title>Thaam — help after a UPI fraud</title>
   </head>
   <body>
     <div id="root"></div>

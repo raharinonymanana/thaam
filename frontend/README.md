@@ -1,16 +1,24 @@
-# React + Vite
+# Thaam — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite single-page app, deployed to Amplify Hosting. Mobile-first, plain
+CSS, no router and no UI library.
 
-Currently, two official plugins are available:
+- `src/state.js` — the whole flow as one reducer (D110): consent → upload →
+  extracting → fields, plus a `case` screen for a victim returning from a
+  reminder email. The case ID lives in this state only, never in
+  localStorage or sessionStorage.
+- `src/api.js` — the only place that touches the network. Every failure becomes
+  an `ApiError` whose message is already safe to show.
+- `src/image.js` — resizes the screenshot in the browser (D73). The canvas
+  re-encode is what strips EXIF, including GPS.
+- `src/hash.js` — reads `#case=<caseId>` (D111); a fragment never reaches a
+  server, so the case ID stays out of access logs and the Referer header.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Commands
 
-## React Compiler
+    npm run dev      # local dev server on :5173
+    npm run lint     # oxlint
+    npm test         # vitest, unit tests only (no DOM, no network)
+    npm run build    # production build into dist/
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+`VITE_API_URL` overrides the API base URL in `src/config.js`.
