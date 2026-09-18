@@ -80,6 +80,80 @@ def test_family_step_details_never_point_at_a_missing_script(path):
         assert "Thaam prepares" not in message[part]
 
 
+# ---------------- helper-facing titles (D123) ----------------
+
+def _titles(path="unauthorised"):
+    return [s["title"] for s in family_email.family_steps(
+        action_steps(path, CLOCKS), family_email.deadlines(CLOCKS))]
+
+
+@pytest.mark.parametrize("path", ["unauthorised", "authorised"])
+@pytest.mark.parametrize("phrase", ["your card", "your bank", "Your card", "Your bank"])
+def test_family_email_never_says_your_card_or_your_bank(path, phrase):
+    # In a helper's inbox "Block your card" reads as an instruction about the
+    # HELPER's own account, which is both wrong and alarming.
+    message = _render(path=path)
+    for part in ("text", "html"):
+        assert phrase not in message[part], (path, part, phrase)
+
+
+def test_the_two_helper_titles_replace_the_victim_facing_ones():
+    titles = _titles("unauthorised")
+    assert "Help block their card or UPI" in titles
+    assert "Get the written complaint to their bank" in titles
+    assert "Block your card or UPI" not in titles
+    assert "Send a written complaint to your bank" not in titles
+
+
+def test_both_new_titles_reach_the_email_itself():
+    message = _render()
+    for part in ("text", "html"):
+        assert "Help block their card or UPI" in message[part]
+        assert "Get the written complaint to their bank" in message[part]
+
+
+def test_the_authorised_path_blocks_payments_but_has_no_bank_letter():
+    titles = _titles("authorised")
+    assert "Help block their card or UPI" in titles
+    # No liability cap exists on that path, so there is no letter to chase.
+    assert "Get the written complaint to their bank" not in titles
+    message = _render(path="authorised")
+    for part in ("text", "html"):
+        assert "Help block their card or UPI" in message[part]
+        assert "written complaint" not in message[part]
+
+
+@pytest.mark.parametrize("path", ["unauthorised", "authorised"])
+def test_no_family_step_title_says_your(path):
+    # A guard for steps added later: the plan speaks to the victim, this email
+    # speaks to someone else, and "your" is the word that gives it away.
+    for title in _titles(path):
+        assert "your" not in title.lower(), title
+
+
+def test_only_the_two_steps_are_overridden():
+    assert set(family_email.FAMILY_TITLES) == {"block_payments", "bank_letter"}
+
+
+@pytest.mark.parametrize("path", ["unauthorised", "authorised"])
+def test_every_other_step_keeps_the_plan_title(path):
+    plan = action_steps(path, CLOCKS)
+    family = family_email.family_steps(plan, family_email.deadlines(CLOCKS))
+    for step, shown in zip(plan, family, strict=True):
+        if step["id"] not in family_email.FAMILY_TITLES:
+            assert shown["title"] == step["title"], step["id"]
+
+
+@pytest.mark.parametrize("path", ["unauthorised", "authorised"])
+def test_the_victim_facing_plan_is_untouched(path):
+    # D123 is a copy change to one email, not to the plan on the victim's screen.
+    titles = {s["id"]: s["title"] for s in action_steps(path, CLOCKS)}
+    assert titles["block_payments"] == "Block your card or UPI"
+    if path == "unauthorised":
+        assert titles["bank_letter"] == "Send a written complaint to your bank"
+    assert titles["call_1930"] == "Call 1930 now"
+
+
 def test_family_email_explains_where_the_wording_lives():
     text = _render()["text"]
     assert ("They have the exact wording to read out in their Thaam case - "
@@ -91,7 +165,7 @@ def test_family_step_details_are_rewritten_for_a_helper():
     steps = {s["title"]: s["detail"] for s in family_email.family_steps(
         action_steps("unauthorised", CLOCKS), family_email.deadlines(CLOCKS))}
     assert steps["Call 1930 now"] == "Call the cyber crime helpline 1930 with them."
-    assert steps["Send a written complaint to your bank"] == (
+    assert steps["Get the written complaint to their bank"] == (
         "Make sure the written complaint reaches their bank by 19 September 2026.")
     assert "cybercrime.gov.in" in steps["File a complaint online"]
 
@@ -120,7 +194,7 @@ def test_family_email_lists_steps_and_dates():
     text = message["text"]
     assert "Someone using Thaam asked us to share their next steps" in text
     assert "1. Call 1930 now - Call the cyber crime helpline 1930 with them." in text
-    assert "Send a written complaint to your bank" in text
+    assert "Get the written complaint to their bank" in text
     assert "Written complaint to the bank due by 19 September 2026" in text
     assert "RBI Ombudsman can be approached from 17 October 2026" in text
     assert "not legal advice" in text

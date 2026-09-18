@@ -43,6 +43,16 @@ FAMILY_DETAILS = {
            "taking the acknowledgement number.",
     "chakshu": "Report the scammer's number on Chakshu, at sancharsaathi.gov.in.",
 }
+# Step id -> a title written for the helper. The plan's own titles address the
+# victim ("Block YOUR card", "...to YOUR bank"), which in a helper's inbox reads
+# as an instruction about the helper's own bank account. Only these two say
+# "your"; every other step keeps the plan's title, so this stays a small
+# override rather than a second set of wording to maintain.
+FAMILY_TITLES = {
+    "block_payments": "Help block their card or UPI",
+    "bank_letter": "Get the written complaint to their bank",
+}
+
 BANK_LETTER_CLOCK = "bankReport"
 
 # Clock -> what the date means, in words a helper can act on.
@@ -72,16 +82,18 @@ def greeting(to_name: str | None) -> str:
 
 
 def family_steps(steps: list[dict], deadline_lines: list[dict]) -> list[dict]:
-    """[{title, detail}] rewritten for a helper: the titles from the plan, the
-    details from FAMILY_DETAILS, so nothing refers to the script or the screen."""
+    """[{title, detail}] rewritten for a helper: the plan's titles except where
+    FAMILY_TITLES overrides one, and the details from FAMILY_DETAILS, so nothing
+    refers to the script or the screen the helper cannot see."""
     dates = {d["clock"]: d["date"] for d in deadline_lines if d.get("clock")}
     out = []
     for step in steps:
-        detail = FAMILY_DETAILS.get(step.get("id"))
+        step_id = step.get("id")
+        detail = FAMILY_DETAILS.get(step_id)
         if detail and "{date}" in detail:
             due = dates.get(BANK_LETTER_CLOCK)
             detail = detail.format(date=due) if due else None
-        out.append({"title": step["title"], "detail": detail})
+        out.append({"title": FAMILY_TITLES.get(step_id, step["title"]), "detail": detail})
     return out
 
 
