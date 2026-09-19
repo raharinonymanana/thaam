@@ -26,11 +26,42 @@ function run(actions, from = initialState) {
 }
 
 describe("initial state", () => {
-  it("starts on consent with nothing given away", () => {
-    expect(initialState.screen).toBe("consent");
+  it("starts on welcome with nothing given away", () => {
+    expect(initialState.screen).toBe("welcome");
     expect(initialState.consent).toBe(false);
     expect(initialState.caseId).toBeNull();
     expect(initialState.busy).toBe(false);
+  });
+});
+
+describe("welcome (S0)", () => {
+  it("continues to consent and changes nothing else", () => {
+    const state = reducer(initialState, { type: "welcome_continued" });
+    expect(state.screen).toBe("consent");
+    expect(state).toEqual({ ...initialState, screen: "consent" });
+  });
+
+  it("is ignored anywhere but the welcome screen", () => {
+    const onConsent = reducer(initialState, { type: "welcome_continued" });
+    expect(reducer(onConsent, { type: "welcome_continued" })).toBe(onConsent);
+
+    const onPlan = reducer(initialState, { type: "plan_succeeded", plan: { path: "unauthorised" } });
+    expect(reducer(onPlan, { type: "welcome_continued" })).toBe(onPlan);
+  });
+
+  it("cannot skip consent: upload is still unreachable from welcome", () => {
+    const state = reducer(initialState, { type: "consent_given" });
+    expect(state.screen).toBe("welcome");
+    expect(state).toBe(initialState);
+  });
+
+  it("is the first step of the whole flow", () => {
+    const state = run([
+      { type: "welcome_continued" },
+      { type: "consent_toggled", value: true },
+      { type: "consent_given" },
+    ]);
+    expect(state.screen).toBe("upload");
   });
 });
 
@@ -54,9 +85,10 @@ describe("consent", () => {
   });
 
   it("refuses to move on without consent", () => {
-    const state = reducer(initialState, { type: "consent_given" });
+    const onConsent = reducer(initialState, { type: "welcome_continued" });
+    const state = reducer(onConsent, { type: "consent_given" });
     expect(state.screen).toBe("consent");
-    expect(state).toBe(initialState);
+    expect(state).toBe(onConsent);
   });
 });
 
@@ -500,10 +532,10 @@ describe("start a new case (D117)", () => {
     expect(state).toEqual(onPlan);
   });
 
-  it("confirming goes back to consent with nothing carried over", () => {
+  it("confirming goes back to welcome with nothing carried over", () => {
     const state = run([{ type: "restart_requested" }, { type: "restart" }], onPlan);
     expect(state).toEqual(initialState);
-    expect(state.screen).toBe("consent");
+    expect(state.screen).toBe("welcome");
     expect(state.caseId).toBeNull();
     expect(state.plan).toBeNull();
     expect(state.reminders).toBeNull();
@@ -580,7 +612,7 @@ describe("delete my case now (D120)", () => {
     expect(state.deleteUi).toEqual({ busy: true, error: null });
   });
 
-  it("starting again from the deleted screen goes back to consent", () => {
+  it("starting again from the deleted screen goes back to welcome", () => {
     const deleted = run([
       { type: "delete_submitting" }, { type: "delete_succeeded" },
     ], onPlan);
@@ -610,8 +642,12 @@ describe("the privacy page", () => {
 
   it("works from every screen it is reachable from", () => {
     const states = {
-      consent: initialState,
-      upload: run([{ type: "consent_toggled", value: true }, { type: "consent_given" }]),
+      welcome: initialState,
+      consent: run([{ type: "welcome_continued" }]),
+      upload: run([
+        { type: "welcome_continued" },
+        { type: "consent_toggled", value: true }, { type: "consent_given" },
+      ]),
       triage: run([
         { type: "extract_succeeded", fields: FIELDS }, { type: "fields_accepted" },
       ]),
@@ -628,8 +664,8 @@ describe("the privacy page", () => {
     const reading = reducer(initialState, { type: "privacy_opened" });
     const again = reducer(reading, { type: "privacy_opened" });
     expect(again).toBe(reading);
-    expect(again.returnTo).toBe("consent");
-    expect(reducer(again, { type: "privacy_closed" }).screen).toBe("consent");
+    expect(again.returnTo).toBe("welcome");
+    expect(reducer(again, { type: "privacy_closed" }).screen).toBe("welcome");
   });
 
   it("falls back to consent if there is somehow nowhere to return to", () => {

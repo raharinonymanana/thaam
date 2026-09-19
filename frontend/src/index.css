@@ -84,6 +84,10 @@
 
 * { box-sizing: border-box; }
 
+/* The action bar is pinned to the bottom of the screen on a phone, so a field
+   scrolled into view by focus must stop short of it, not slide underneath. */
+html { scroll-padding-bottom: 96px; }
+
 body {
   margin: 0;
   background: var(--page);
@@ -245,46 +249,174 @@ a {
   text-underline-offset: 3px;
 }
 
+input[type="checkbox"],
+input[type="radio"] { accent-color: var(--accent); }
+
+/* The whole bordered card is the tap target - it is a <label>. */
 .check {
   display: flex;
   gap: var(--s3);
   align-items: flex-start;
   margin-top: var(--s5);
   padding: var(--s3);
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: var(--radius-btn);
   min-height: var(--tap);
   cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease;
 }
 
-input[type="checkbox"],
-input[type="radio"] { accent-color: var(--accent); }
+.check-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
 
 .check input {
-  width: 1.4rem;
-  height: 1.4rem;
-  margin: 0.1rem 0 0;
+  width: 24px;
+  height: 24px;
+  margin: 0;
   flex: none;
+  accent-color: var(--accent);
 }
 
-.field input[type="file"] {
-  display: block;
-  width: 100%;
+/* A smaller button for a secondary action that should not compete with the
+   one in the action bar. */
+.button-small {
+  display: inline-flex;
+  width: auto;
   min-height: var(--tap);
-  padding: var(--s3);
-  border: 1.5px dashed var(--line);
-  border-radius: var(--radius-btn);
-  background: var(--page);
-  color: var(--ink);
-  font: inherit;
+  margin-top: var(--s3);
+  padding: var(--s2) var(--s5);
 }
+
+/* ---------- symbol rows: an icon, then a sentence ---------- */
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
+  padding: var(--s2) 0;
+}
+
+/* The first line of text is 26 px tall, the icon 20: a 3 px nudge centres it. */
+.row > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--accent);
+}
+
+p.row { margin: var(--s2) 0 0; padding: 0; }
+
+/* ---------- welcome ---------- */
+
+.eyebrow {
+  margin: 0 0 var(--s1);
+  color: var(--accent);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-line { margin: 0; }
+
+.screen > .rows { margin-top: var(--s4); }
+
+/* ---------- step indicator ---------- */
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.stepper-text {
+  color: var(--ink-soft);
+  font-size: var(--fs-caption);
+}
+
+.stepper-bars { display: flex; gap: 6px; }
+
+.stepper-bar {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.stepper-bar-on { background: var(--accent); }
+
+/* ---------- screenshot: drop zone and preview ---------- */
+
+.zone {
+  position: relative;      /* the visually-hidden input is positioned against this */
+  border-radius: var(--radius-card);
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s5);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-card);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.dropzone-off { opacity: 0.5; cursor: not-allowed; }
+
+.dropzone-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--s2);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dropzone-title { font-weight: 700; }
+
+.dropzone-sub {
+  color: var(--ink-soft);
+  font-size: var(--fs-small);
+}
+
+/* The input is what takes keyboard focus, but the zone is what people see, so
+   the ring is drawn on the zone. focus-visible where :has() exists, so a tap
+   that opens the picker does not leave a ring behind; focus-within elsewhere. */
+.zone:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@supports selector(:has(*)) {
+  .zone:focus-within { outline: none; }
+
+  .zone:has(input:focus-visible) {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+.zone-preview { text-align: center; }
 
 .preview {
   display: block;
   width: 100%;
-  max-height: 55svh;
-  margin-top: var(--s4);
+  max-height: 240px;
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: var(--radius-btn);
@@ -359,6 +491,95 @@ input[type="radio"] { accent-color: var(--accent); }
   font-weight: 700;
 }
 
+/* The label with its state pill beside it. */
+.field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s1);
+  padding: 2px var(--s2);
+  border-radius: var(--radius-chip);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.badge-found { background: var(--accent-soft); color: var(--accent); }
+
+.badge-needs { background: var(--amber-bg); color: var(--amber); }
+
+/* ---------- the details, in two cards ---------- */
+
+.group {
+  margin-top: var(--s4);
+  padding: 0 var(--s4) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+}
+
+.group-title {
+  margin: var(--s4) 0 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-small);
+  font-weight: 700;
+}
+
+.group .field:first-of-type { margin-top: var(--s3); }
+
+/* ---------- the screenshot, beside the form ---------- */
+
+.compare { margin-bottom: var(--s2); }
+
+.compare-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s2);
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compare-thumb {
+  flex: none;
+  height: 64px;
+  width: auto;
+  max-width: 96px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.compare-toggle > span { flex: 1; }
+
+.chevron { transition: transform 150ms ease; }
+.chevron-open { transform: rotate(180deg); }
+
+.compare-full {
+  display: block;
+  width: 100%;
+  max-height: 70svh;
+  margin-top: var(--s2);
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background: var(--page);
+}
+
 .req { font-weight: 400; color: var(--ink-soft); }
 
 .field .hint { margin: 0 0 var(--s2); }
@@ -400,13 +621,6 @@ input[type="radio"] { accent-color: var(--accent); }
   color: var(--urgent);
   font-size: var(--fs-small);
   font-weight: 700;
-}
-
-.missing {
-  margin: var(--s2) 0 0;
-  color: var(--ink-soft);
-  font-size: var(--fs-caption);
-  font-style: italic;
 }
 
 /* The XX is ours, not something to be typed over. */
@@ -454,7 +668,7 @@ input[type="radio"] { accent-color: var(--accent); }
   align-items: center;
   margin-bottom: var(--s3);
   padding: var(--s4);
-  min-height: 60px;
+  min-height: 56px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-btn);
   background: var(--card);
@@ -468,11 +682,14 @@ input[type="radio"] { accent-color: var(--accent); }
   background: var(--accent-soft);
 }
 
+/* accent-color on the input itself, not inherited from a parent rule: a radio
+   with none draws in the browser's own colour, which was black in light mode. */
 .option input {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 24px;
+  height: 24px;
   flex: none;
   margin: 0;
+  accent-color: var(--accent);
 }
 
 .reassure { margin-top: var(--s2); }
@@ -750,14 +967,53 @@ input[type="radio"] { accent-color: var(--accent); }
 
 .back { margin-top: 0; margin-bottom: var(--s4); }
 
-.privacy-link { margin: var(--s4) 0 0; }
-
 .footer .linkish {
   padding-left: 0;
   font-size: var(--fs-caption);
 }
 
 .footer p { margin: var(--s2) 0 0; }
+
+/* ---------- reading: the shape of what is coming ---------- */
+
+.skeleton { margin-top: var(--s4); }
+
+.skeleton-field { margin-top: var(--s4); }
+
+.skeleton-label,
+.skeleton-input {
+  display: block;
+  border-radius: var(--radius-btn);
+  background: var(--line);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton-label { width: 40%; height: 14px; margin-bottom: var(--s2); }
+
+.skeleton-input { height: var(--tap); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ---------- sticky action bar (D132) ---------- */
+
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  /* Bleeds to the card's edges so it reads as a docked bar, not a floating box. */
+  margin: var(--s5) calc(-1 * var(--s4)) calc(-1 * var(--s4));
+  padding: var(--s3) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px);
+  background: var(--card);
+}
+
+.action-bar .button { margin-top: 0; }
+
+.action-bar .button + .button { margin-top: var(--s2); }
 
 /* ---------- desktop frame (D127) ---------- */
 
@@ -770,6 +1026,12 @@ input[type="radio"] { accent-color: var(--accent); }
   }
 
   .app { padding-top: var(--s6); }
+
+  /* The question-and-answer screens are one narrow centred card. */
+  .app-flow { max-width: 520px; }
+
+  /* Nothing to pin on a desktop: the bar is just the end of the card. */
+  .action-bar { position: static; }
 
   .screen {
     box-shadow: 0 1px 2px rgba(21, 48, 44, 0.06),
@@ -790,6 +1052,10 @@ input[type="radio"] { accent-color: var(--accent); }
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* A pulse is decoration: hold it still rather than shorten it to a flicker. */
+  .skeleton-label,
+  .skeleton-input { animation: none; }
 
   /* The spinner says "still working"; frozen it would say the opposite. */
   .spinner {

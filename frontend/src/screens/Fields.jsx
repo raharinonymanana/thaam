@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import ActionBar from "../components/ActionBar";
+import Icon from "../components/Icon";
 import Screen from "../components/Screen";
 import { Notice } from "../components/Notice";
 import { countFound, FIELD_KEYS, REQUIRED_KEYS } from "../state";
@@ -54,11 +56,62 @@ const FIELDS = {
   },
 };
 
-// The order on screen: what the victim is most likely to find first.
-const ORDER = ["amount", "txn_date", "txn_time", "utr",
-  "account_masked", "bank", "payee_vpa", "payee_phone"];
+// The order on screen: what the victim is most likely to find first, in two
+// cards. The order inside is exactly the order it was before the cards.
+const GROUPS = [
+  { id: "payment", title: "Payment", keys: ["amount", "txn_date", "txn_time", "utr"] },
+  { id: "accounts", title: "Accounts",
+    keys: ["account_masked", "bank", "payee_vpa", "payee_phone"] },
+];
 
-function Field({ name, value, error, missing, inputRef, onChange }) {
+/** The screenshot, small, at the top: the victim is copying eight values off
+ * it, and having it beside the form saves them switching apps. Tapping opens it
+ * full width in place - an expander, not a modal, so nothing traps focus and
+ * the form is one scroll away. Object URLs pin the decoded image in memory, so
+ * it is revoked when this goes. */
+function Compare({ file }) {
+  const [url, setUrl] = useState(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!file) return undefined;
+    const made = URL.createObjectURL(file);
+    // An object URL is an external resource: it has to be made here so the
+    // cleanup below can revoke exactly this one, including under StrictMode's
+    // mount-unmount-mount, where a URL made during render would be revoked and
+    // then reused.
+    // eslint-disable-next-line react/set-state-in-effect
+    setUrl(made);
+    return () => { URL.revokeObjectURL(made); setUrl(null); };
+  }, [file]);
+
+  if (!file || !url) return null;
+  return (
+    <div className="compare">
+      <button
+        type="button"
+        className="compare-toggle"
+        aria-expanded={open}
+        aria-controls="compare-panel"
+        onClick={() => setOpen((was) => !was)}
+      >
+        <img className="compare-thumb" src={url} alt="" />
+        <span>Tap to compare</span>
+        <Icon name="chevron-down" size={20} className={open ? "chevron chevron-open" : "chevron"} />
+      </button>
+      {open && (
+        <img
+          id="compare-panel"
+          className="compare-full"
+          src={url}
+          alt="Your screenshot, full size"
+        />
+      )}
+    </div>
+  );
+}
+
+function Field({ name, value, error, missing, found, inputRef, onChange }) {
   const spec = FIELDS[name];
   const required = REQUIRED_KEYS.includes(name);
   const errorId = error ? `${name}-error` : undefined;
@@ -77,10 +130,22 @@ function Field({ name, value, error, missing, inputRef, onChange }) {
 
   return (
     <div className={`field${error ? " field-bad" : ""}`}>
-      <label className="field-label" htmlFor={name}>
-        {spec.label}
-        {required && <span className="req"> (needed)</span>}
-      </label>
+      <div className="field-head">
+        <label className="field-label" htmlFor={name}>
+          {spec.label}
+          {required && <span className="req"> (needed)</span>}
+        </label>
+        {/* Colour is never the only signal: each pill says its state in words.
+            "Needs you" is hidden from screen readers because the sentence
+            below carries the same meaning for them. */}
+        {found && (
+          <span className="badge badge-found">
+            <Icon name="check" size={12} />
+            Found
+          </span>
+        )}
+        {missing && <span className="badge badge-needs" aria-hidden="true">Needs you</span>}
+      </div>
       <p className="hint" id={hintId}>{spec.hint}</p>
 
       <div className={spec.prefix ? "input-prefixed" : undefined}>
@@ -102,7 +167,7 @@ function Field({ name, value, error, missing, inputRef, onChange }) {
       </div>
 
       {missing && !error && (
-        <p className="missing">Not found — please type it if you can</p>
+        <p className="sr-only">Not found — please type it if you can</p>
       )}
       {error && <p className="field-error" id={errorId} role="alert">{error}</p>}
     </div>
@@ -110,7 +175,8 @@ function Field({ name, value, error, missing, inputRef, onChange }) {
 }
 
 export default function Fields({
-  fields, fieldErrors, focusField, missingFields, unreadable, busy, onChange, onContinue,
+  file = null, fields, fieldErrors, focusField, missingFields, unreadable, busy,
+  onChange, onContinue,
 }) {
   const inputs = useRef({});
   const found = countFound(fields);
@@ -137,25 +203,39 @@ export default function Fields({
         </p>
       )}
 
+      <Compare file={file} />
+
       <form
         noValidate
         onSubmit={(event) => { event.preventDefault(); onContinue(); }}
       >
-        {ORDER.map((name) => (
-          <Field
-            key={name}
-            name={name}
-            value={fields?.[name] ?? ""}
-            error={fieldErrors?.[name] ?? null}
-            missing={missingFields?.includes(name) && !(fields?.[name] ?? "")}
-            inputRef={(node) => { inputs.current[name] = node; }}
-            onChange={onChange}
-          />
+        {GROUPS.map((group) => (
+          <section key={group.id} className="group" aria-labelledby={`group-${group.id}`}>
+            <h2 className="group-title" id={`group-${group.id}`}>{group.title}</h2>
+            {group.keys.map((name) => {
+              const value = fields?.[name] ?? "";
+              const gone = missingFields?.includes(name);
+              return (
+                <Field
+                  key={name}
+                  name={name}
+                  value={value}
+                  error={fieldErrors?.[name] ?? null}
+                  missing={gone && !value}
+                  found={!gone && value !== ""}
+                  inputRef={(node) => { inputs.current[name] = node; }}
+                  onChange={onChange}
+                />
+              );
+            })}
+          </section>
         ))}
 
-        <button type="submit" className="button" disabled={busy} aria-busy={busy}>
-          Continue
-        </button>
+        <ActionBar>
+          <button type="submit" className="button" disabled={busy} aria-busy={busy}>
+            Continue
+          </button>
+        </ActionBar>
       </form>
     </Screen>
   );

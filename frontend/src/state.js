@@ -8,7 +8,7 @@
 
 import { FAMILY_MAX_SENDS, fromCase, fromEnrolment } from "./reminders";
 
-export const SCREENS = ["consent", "upload", "extracting", "fields", "triage",
+export const SCREENS = ["welcome", "consent", "upload", "extracting", "fields", "triage",
   "plan", "case", "privacy", "deleted"];
 
 // The eight details the plan is built from. sender_id, direction and missing
@@ -25,7 +25,9 @@ export const SHARED_ANSWERS = ["yes", "no", "not_sure"];
 export const SHARE_LIMIT_MESSAGE = `You've used all ${FAMILY_MAX_SENDS} shares for this case.`;
 
 export const initialState = {
-  screen: "consent",
+  // Someone who has just lost money sees the one useful thing - the 1930
+  // number - before anything is asked of them. Consent comes second.
+  screen: "welcome",
   consent: false,
   caseId: null,
   file: null,
@@ -102,6 +104,12 @@ function withoutField(errors, key) {
 
 export function reducer(state, action) {
   switch (action.type) {
+    case "welcome_continued":
+      // Only from the welcome screen: a stray dispatch from anywhere else must
+      // not pull someone out of their plan and back into the consent step.
+      if (state.screen !== "welcome") return state;
+      return { ...state, screen: "consent" };
+
     case "consent_toggled":
       return { ...state, consent: action.value === true, error: null };
 

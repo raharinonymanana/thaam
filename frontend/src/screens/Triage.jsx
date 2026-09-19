@@ -1,3 +1,4 @@
+import ActionBar from "../components/ActionBar";
 import Screen from "../components/Screen";
 import { ErrorNotice } from "../components/Notice";
 
@@ -51,19 +52,21 @@ export default function Triage({ shared, busy, error, onAnswer, onSubmit, onBack
 
       <ErrorNotice error={error} onRetry={onSubmit} busy={busy} />
 
-      <button
-        type="button"
-        className="button"
-        onClick={onSubmit}
-        disabled={busy || !shared}
-        aria-busy={busy}
-      >
-        {busy ? "Building your plan…" : "Build my plan"}
-      </button>
+      <ActionBar>
+        <button
+          type="button"
+          className="button"
+          onClick={onSubmit}
+          disabled={busy || !shared}
+          aria-busy={busy}
+        >
+          {busy ? "Building your plan…" : "Build my plan"}
+        </button>
 
-      <button type="button" className="button button-quiet" onClick={onBack} disabled={busy}>
-        Back to the details
-      </button>
+        <button type="button" className="button button-quiet" onClick={onBack} disabled={busy}>
+          Back to the details
+        </button>
+      </ActionBar>
     </Screen>
   );
 }

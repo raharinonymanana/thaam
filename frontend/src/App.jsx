@@ -10,6 +10,7 @@ import { initialState, planPayload, reducer } from "./state";
 import { validateFields } from "./validate";
 import Footer from "./components/Footer";
 import LogoMark from "./components/LogoMark";
+import Stepper from "./components/Stepper";
 import Case from "./screens/Case";
 import Consent from "./screens/Consent";
 import Extracting from "./screens/Extracting";
@@ -19,6 +20,7 @@ import Plan from "./screens/Plan";
 import Privacy from "./screens/Privacy";
 import Triage from "./screens/Triage";
 import Upload from "./screens/Upload";
+import Welcome from "./screens/Welcome";
 
 // Messages we wrote for a victim to read. Anything else - a TypeError, a
 // stack, an S3 XML blob - is replaced by a plain sentence, so no internal
@@ -29,6 +31,20 @@ const NO_PLAN_MESSAGE =
   "This case was never finished, so there is no plan to show. You can start again.";
 
 const DEMO_DISABLED_MESSAGE = "Demo timing is not enabled.";
+
+// The three screens that ask for something are steps; welcome, consent, the plan
+// and the rest are not. Reading the screenshot is still step 1: it is the
+// upload finishing, not a new thing being asked.
+const STEPS = {
+  upload: { step: 1, label: "Screenshot" },
+  extracting: { step: 1, label: "Screenshot" },
+  fields: { step: 2, label: "Details" },
+  triage: { step: 3, label: "Question" },
+};
+
+// The question-and-answer screens sit in a narrower column on a desktop. The
+// plan is wider and gets its own layout, so it is not in this list.
+const FLOW_SCREENS = ["welcome", "consent", "upload", "extracting", "fields", "triage"];
 
 function notice(err) {
   if (err instanceof ApiError) return { message: err.message, code: err.code };
@@ -238,9 +254,10 @@ export default function App() {
   };
 
   const openPrivacy = () => dispatch({ type: "privacy_opened" });
+  const step = STEPS[state.screen];
 
   return (
-    <div className="app">
+    <div className={`app${FLOW_SCREENS.includes(state.screen) ? " app-flow" : ""}`}>
       <header className="masthead">
         <p className="brand">
           <LogoMark className="logo-mark" size={36} />
@@ -249,13 +266,18 @@ export default function App() {
         <p className="brand-sub">Steady steps after an online payment fraud</p>
       </header>
 
+      {step && <Stepper step={step.step} of={3} label={step.label} />}
+
       <main>
+        {state.screen === "welcome" && (
+          <Welcome onContinue={() => dispatch({ type: "welcome_continued" })} />
+        )}
+
         {state.screen === "consent" && (
           <Consent
             consent={state.consent}
             onToggle={(value) => dispatch({ type: "consent_toggled", value })}
             onContinue={() => dispatch({ type: "consent_given" })}
-            onOpenPrivacy={openPrivacy}
           />
         )}
 
@@ -279,6 +301,7 @@ export default function App() {
 
         {state.screen === "fields" && (
           <Fields
+            file={state.file}
             fields={state.fields}
             fieldErrors={state.fieldErrors}
             focusField={state.focusField}
