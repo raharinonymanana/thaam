@@ -1,168 +1,31 @@
-import { useState } from "react";
-import { ApiError, getAudio } from "../api";
-import { deadlineRows, ESTIMATED_NOTE, goldenHourLine } from "../format";
-import { ErrorNotice, Notice } from "./Notice";
-import Icon from "./Icon";
+import { useEffect, useState } from "react";
+import { bankLetter, LETTER_DISCLAIMER, ncrpText } from "../copytext";
+import {
+  extraDisclaimers, loadTicks, progressOf, saveTicks, ticksKey, timelineRows,
+} from "../planview";
+import { scrollBehavior } from "../scrollTo";
+import Checklist from "./Checklist";
 import CopyBox from "./CopyBox";
 import FamilySection from "./FamilySection";
+import Fold from "./Fold";
+import Icon from "./Icon";
+import { ErrorNotice, Notice } from "./Notice";
+import NowHero from "./NowHero";
+import { JumpBar, PlanReady, Progress, Summary } from "./PlanTop";
 import RemindersSection from "./RemindersSection";
-import { bankLetter, LETTER_DISCLAIMER, ncrpText } from "../copytext";
+import Timeline from "./Timeline";
 
 // The plan, rendered once and used twice: straight after POST /plan, and again
 // when a victim comes back to GET /cases/{id} from a reminder email. Both
 // responses carry the same keys, so there is one component and no second copy
-// of this wording to drift out of step.
-
-const LANGUAGES = [
-  { code: "en", label: "English", name: "EN" },
-  { code: "hi", label: "हिन्दी", name: "हिन्दी" },
-];
-
-const AUDIO_FALLBACK =
-  "Audio is unavailable right now. Please read the script on screen.";
-
-function CallNow({ clocks }) {
-  const line = goldenHourLine(clocks?.goldenHour);
-  return (
-    <section className="card call-now">
-      <h2>Call 1930 now</h2>
-      <a className="button button-call" href="tel:1930">
-        <Icon name="phone" size={22} />
-        Call 1930 now
-      </a>
-      {line && <p className="golden">{line}</p>}
-      <p className="hint">
-        1930 is the national cyber crime helpline. Read the script below to them.
-      </p>
-    </section>
-  );
-}
-
-function Script({ caseId, script }) {
-  const [lang, setLang] = useState("en");
-  // Audio is view state, not flow state: the URL expires in minutes, so it is
-  // fetched on the press and never carried around in the reducer.
-  const [audio, setAudio] = useState({});
-  const current = audio[lang] ?? {};
-
-  async function listen() {
-    setAudio((prev) => ({ ...prev, [lang]: { busy: true } }));
-    try {
-      const { url } = await getAudio(caseId, lang);
-      setAudio((prev) => ({ ...prev, [lang]: { url } }));
-    } catch (err) {
-      const message = err instanceof ApiError && err.code === "audio_unavailable"
-        ? err.message
-        : AUDIO_FALLBACK;
-      setAudio((prev) => ({ ...prev, [lang]: { error: message } }));
-    }
-  }
-
-  return (
-    <section className="card">
-      <h2>Your call script</h2>
-
-      <div className="tabs" role="tablist" aria-label="Script language">
-        {LANGUAGES.map((option) => (
-          <button
-            key={option.code}
-            type="button"
-            role="tab"
-            id={`tab-${option.code}`}
-            aria-selected={lang === option.code}
-            aria-controls={`panel-${option.code}`}
-            className={`tab${lang === option.code ? " tab-on" : ""}`}
-            onClick={() => setLang(option.code)}
-          >
-            {option.name}
-          </button>
-        ))}
-      </div>
-
-      <div
-        role="tabpanel"
-        id={`panel-${lang}`}
-        aria-labelledby={`tab-${lang}`}
-        tabIndex={0}
-      >
-        <p className="script" lang={lang}>{script?.[lang]}</p>
-
-        <button
-          type="button"
-          className="button button-quiet"
-          onClick={listen}
-          disabled={current.busy}
-          aria-busy={current.busy}
-        >
-          {current.busy ? "Preparing audio…" : `Listen (${LANGUAGES.find((l) => l.code === lang).label})`}
-        </button>
-
-        {current.url && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption -- the caption is
-          // the script printed above this player, in the same language.
-          <audio className="player" controls autoPlay src={current.url}>
-            Your browser cannot play audio. Please read the script above.
-          </audio>
-        )}
-        {current.error && <Notice kind="warn">{current.error}</Notice>}
-      </div>
-    </section>
-  );
-}
-
-function Deadlines({ clocks }) {
-  const rows = deadlineRows(clocks);
-  if (rows.length === 0) return null;
-  return (
-    <section className="card">
-      <h2>Your deadlines</h2>
-      <ul className="deadlines">
-        {rows.map((row) => (
-          <li key={row.id}>
-            <p className="deadline-label">{row.label}</p>
-            <p className="deadline-date">{row.date}</p>
-            <p className="deadline-note">{ESTIMATED_NOTE}</p>
-            {row.url && (
-              <a href={row.url} target="_blank" rel="noopener noreferrer">
-                Open the RBI complaint site
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function Steps({ steps }) {
-  if (!steps?.length) return null;
-  return (
-    <section className="card">
-      <h2>Your steps</h2>
-      <ol className="steps">
-        {steps.map((step) => (
-          <li key={step.id}>
-            <p className="step-title">{step.title}</p>
-            <p className="step-detail">{step.detail}</p>
-            {step.tel && <a className="step-link" href={`tel:${step.tel}`}>Call {step.tel}</a>}
-            {step.url && (
-              <a className="step-link" href={step.url} target="_blank" rel="noopener noreferrer">
-                Open {new URL(step.url).host}
-              </a>
-            )}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
+// of this wording to drift out of step. `reopened` is the only difference: a
+// fresh plan announces itself, a returning one does not.
 
 /** D121: the two documents the victim has to produce, built here from the
  * details they confirmed. The letter is unauthorised-only - on the authorised
  * path bankLetter returns null and nothing is rendered, because there is no
  * unauthorised transaction to report and no liability cap to claim. */
-function Documents({ fields, path }) {
-  const letter = bankLetter(fields, path);
+function Documents({ fields, path, letter }) {
   return (
     <>
       <CopyBox
@@ -256,68 +119,169 @@ function StartNewCase({ confirming, onRequest, onCancel, onConfirm }) {
 
 export default function PlanView({
   caseId, plan, fields, reminders, remindersUi, family, familyUi, demoMode,
-  confirmRestart, confirmDelete, deleteUi,
+  confirmRestart, confirmDelete, deleteUi, reopened = false, now,
   onEnrol, onShare, onRestartRequest, onRestartCancel, onRestart,
   onDeleteRequest, onDeleteCancel, onDelete,
 }) {
+  // Which steps are ticked lives here, not in the reducer: it is a private
+  // note-to-self kept on this phone (D126), and never part of the case. It is
+  // stored under a hash of the case ID (D136), which takes a moment to work out
+  // and may not be possible at all (no secure context): until the key arrives,
+  // and for good when it is null, ticks live in memory for this visit only.
+  const [ticks, setTicks] = useState([]);
+  const [tickKey, setTickKey] = useState(null);
+  const [open, setOpen] = useState({ documents: false, track: false, more: false });
+  const [copyRequest, setCopyRequest] = useState(null);
+  const [mountedAt] = useState(() => new Date());
+
+  const setFold = (name, value) => setOpen((prev) => ({ ...prev, [name]: value }));
+
+  useEffect(() => {
+    let stale = false;
+    ticksKey(caseId).then((key) => {
+      if (stale) return;
+      setTickKey(key);
+      const saved = loadTicks(key);
+      // Merged, not replaced: a tick made in the instant before the key
+      // arrived is not thrown away by the load.
+      if (saved.length > 0) setTicks((prev) => [...new Set([...saved, ...prev])]);
+    });
+    return () => { stale = true; };
+  }, [caseId]);
+
+  // "Copy complaint text" opens the fold and, once it is open, lands on the box.
+  // Focus goes to the textarea so the copy is one press away and a screen
+  // reader is told where it went. Scrolling is separate so it can respect
+  // reduced motion.
+  useEffect(() => {
+    if (!copyRequest) return;
+    const box = document.getElementById(copyRequest.id);
+    if (!box) return;
+    box.focus({ preventScroll: true });
+    box.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+  }, [copyRequest]);
+
   if (!plan) return null;
   // A reopened case carries its own confirmed fields; a freshly built plan
   // does not, so the flow's own copy is used there.
   const values = plan.fields ?? fields ?? {};
+  const today = now ?? mountedAt;
+  const steps = plan.steps ?? [];
+  const { done, total } = progressOf(steps, ticks);
+  const letter = bankLetter(values, plan.path);
+  // The footer already carries the standard lines on every screen; only a line
+  // it does not have is worth repeating here.
+  const extra = extraDisclaimers(plan.disclaimers);
+
+  function toggle(id) {
+    const next = ticks.includes(id) ? ticks.filter((t) => t !== id) : [...ticks, id];
+    setTicks(next);
+    saveTicks(tickKey, next);
+  }
+
+  function copyTo(id) {
+    setFold("documents", true);
+    setCopyRequest({ id });
+  }
+
+  const targets = [
+    { id: "now", label: "Now" },
+    steps.length > 0 && { id: "checklist", label: "Checklist" },
+    timelineRows(plan.clocks).length > 0 && { id: "dates", label: "Dates" },
+    { id: "more", label: "More" },
+  ].filter(Boolean);
 
   return (
     <div className="plan">
-      <CallNow clocks={plan.clocks} />
+      {!reopened && <PlanReady />}
+      <Summary fields={values} />
+      <JumpBar targets={targets} onJump={(id) => id === "more" && setFold("more", true)} />
 
-      {plan.notSure && (
-        <Notice kind="warn">
-          You weren&apos;t sure, so Thaam used the path with the most protection.
-          Report to your bank quickly either way.
-        </Notice>
-      )}
+      <div className="plan-side">
+        <Progress done={done} total={total} />
+        <NowHero caseId={caseId} clocks={plan.clocks} script={plan.script} />
+        {plan.notSure && (
+          <Notice kind="warn">
+            You weren&apos;t sure, so Thaam used the path with the most protection.
+            Report to your bank quickly either way.
+          </Notice>
+        )}
+      </div>
 
-      <Script caseId={caseId} script={plan.script} />
-      <Deadlines clocks={plan.clocks} />
-      <Steps steps={plan.steps} />
-      <Documents fields={values} path={plan.path} />
+      <div className="plan-main">
+        <Checklist
+          steps={steps}
+          clocks={plan.clocks}
+          ticks={ticks}
+          onToggle={toggle}
+          onCopy={copyTo}
+          canCopy={(id) => (id === "bank_letter" ? Boolean(letter) : true)}
+          now={today}
+        />
+        <Timeline clocks={plan.clocks} now={today} />
 
-      <section className="card">
-        <h2>Keep this page</h2>
-        <p>
-          Bookmark this page to come back to your plan. Anyone with this link
-          can see your case — don&apos;t share it.
-        </p>
-      </section>
+        <Fold
+          id="documents"
+          icon="file-text"
+          title="Documents to copy"
+          open={open.documents}
+          onToggle={(value) => setFold("documents", value)}
+        >
+          <Documents fields={values} path={plan.path} letter={letter} />
+        </Fold>
 
-      <DeleteCase
-        confirming={confirmDelete}
-        ui={deleteUi}
-        onRequest={onDeleteRequest}
-        onCancel={onDeleteCancel}
-        onConfirm={onDelete}
-      />
+        <Fold
+          icon="bell"
+          title="Stay on track"
+          open={open.track}
+          onToggle={(value) => setFold("track", value)}
+        >
+          <RemindersSection
+            reminders={reminders}
+            ui={remindersUi}
+            demoMode={demoMode}
+            onEnrol={onEnrol}
+          />
+          <FamilySection family={family} ui={familyUi} onShare={onShare} />
+        </Fold>
 
-      <RemindersSection
-        reminders={reminders}
-        ui={remindersUi}
-        demoMode={demoMode}
-        onEnrol={onEnrol}
-      />
+        <Fold
+          id="more"
+          icon="lock-keyhole"
+          title="Your case"
+          open={open.more}
+          onToggle={(value) => setFold("more", value)}
+        >
+          <section className="card">
+            <h2>Keep this page</h2>
+            <p>
+              Bookmark this page to come back to your plan. Anyone with this link
+              can see your case — don&apos;t share it.
+            </p>
+          </section>
 
-      <FamilySection family={family} ui={familyUi} onShare={onShare} />
+          <DeleteCase
+            confirming={confirmDelete}
+            ui={deleteUi}
+            onRequest={onDeleteRequest}
+            onCancel={onDeleteCancel}
+            onConfirm={onDelete}
+          />
 
-      {plan.disclaimers?.length > 0 && (
-        <ul className="plan-disclaimers">
-          {plan.disclaimers.map((line) => <li key={line}>{line}</li>)}
-        </ul>
-      )}
+          <StartNewCase
+            confirming={confirmRestart}
+            onRequest={onRestartRequest}
+            onCancel={onRestartCancel}
+            onConfirm={onRestart}
+          />
+        </Fold>
 
-      <StartNewCase
-        confirming={confirmRestart}
-        onRequest={onRestartRequest}
-        onCancel={onRestartCancel}
-        onConfirm={onRestart}
-      />
+        {extra.length > 0 && (
+          <ul className="plan-disclaimers">
+            {extra.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

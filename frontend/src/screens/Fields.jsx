@@ -64,6 +64,9 @@ const GROUPS = [
     keys: ["account_masked", "bank", "payee_vpa", "payee_phone"] },
 ];
 
+// The two ways a payee is named. Either one satisfies the other.
+const ALTERNATIVES = { payee_vpa: "payee_phone", payee_phone: "payee_vpa" };
+
 /** The screenshot, small, at the top: the victim is copying eight values off
  * it, and having it beside the form saves them switching apps. Tapping opens it
  * full width in place - an expander, not a modal, so nothing traps focus and
@@ -215,13 +218,18 @@ export default function Fields({
             {group.keys.map((name) => {
               const value = fields?.[name] ?? "";
               const gone = missingFields?.includes(name);
+              // A payment goes to a UPI ID or to a phone number, not both: if
+              // one of the two is filled in, the other is not missing, it is
+              // simply not what happened.
+              const other = ALTERNATIVES[name];
+              const covered = other !== undefined && (fields?.[other] ?? "") !== "";
               return (
                 <Field
                   key={name}
                   name={name}
                   value={value}
                   error={fieldErrors?.[name] ?? null}
-                  missing={gone && !value}
+                  missing={gone && !value && !covered}
                   found={!gone && value !== ""}
                   inputRef={(node) => { inputs.current[name] = node; }}
                   onChange={onChange}

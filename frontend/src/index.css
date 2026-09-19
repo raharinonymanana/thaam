@@ -266,10 +266,6 @@ input[type="radio"] { accent-color: var(--accent); }
   transition: border-color 150ms ease, background 150ms ease;
 }
 
-.check-on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
 
 .check input {
   width: 24px;
@@ -676,11 +672,13 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   transition: border-color 150ms ease, background 150ms ease;
 }
 
+.check-on,
 .option-on {
   border-color: var(--accent);
-  border-width: 2px;
   background: var(--accent-soft);
 }
+
+.option-on { border-width: 2px; }
 
 /* accent-color on the input itself, not inherited from a parent rule: a radio
    with none draws in the browser's own colour, which was black in light mode. */
@@ -790,67 +788,370 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 .player { display: block; width: 100%; margin-top: var(--s3); }
 
-.deadlines, .steps { margin: 0; padding-left: 0; list-style: none; }
+.step-detail { margin: var(--s1) 0 0; }
 
-.deadlines li {
-  padding: var(--s3) 0;
+.step-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--s1);
+  min-height: 44px;
+  line-height: 1.4;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---------- plan: the ready moment and the case summary ---------- */
+
+.plan-ready {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  max-height: 72px;
+  margin-top: var(--s3);
+  padding: var(--s3);
+  overflow: hidden;
+  border-radius: var(--radius-btn);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  transition: max-height 200ms ease, opacity 200ms ease, margin 200ms ease,
+    padding 200ms ease, visibility 0s linear 200ms;
+}
+
+.plan-ready-gone {
+  max-height: 0;
+  margin-top: 0;
+  padding-block: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* pathLength="1" on the tick, so one dash length draws it at any size. */
+.draw-check {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: draw-check 400ms ease-out both;
+}
+
+@keyframes draw-check {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin: var(--s3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pill {
+  padding: var(--s1) var(--s3);
+  border-radius: var(--radius-chip);
+  background: var(--info-bg);
+  font-size: var(--fs-small);
+  font-weight: 700;
+}
+
+/* ---------- plan: jump bar (a phone only) ---------- */
+
+.jump-bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  margin: var(--s3) calc(-1 * var(--s4)) 0;
+  padding: var(--s2) var(--s4);
+  overflow-x: auto;             /* scrolls inside the bar, never the page */
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--page);
+}
+
+.jump-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Every place the bar jumps to stops short of it. */
+#now, #checklist, #dates, #more, #documents { scroll-margin-top: 72px; }
+
+/* ---------- plan: progress ---------- */
+
+.progress-block { margin-top: var(--s4); }
+
+.progress-text {
+  margin: 0 0 var(--s2);
+  font-size: var(--fs-small);
+  font-weight: 700;
+}
+
+.progress {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 200ms ease;
+}
+
+/* ---------- plan: the hero ---------- */
+
+.call-now .eyebrow { margin-bottom: var(--s2); }
+
+.call-now .script { background: var(--card); }
+
+.script-block h2 { margin: var(--s5) 0 var(--s2); }
+
+/* Something the caller fills in or says aloud. Amber, and bracketed in the
+   text itself, so it is not the colour alone that marks it. */
+.ph {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+/* ---------- plan: checklist ---------- */
+
+.step-group + .step-group { margin-top: var(--s4); }
+
+.group-heading {
+  margin: 0 0 var(--s1);
+  color: var(--ink-soft);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.steps-list { margin: 0; padding: 0; list-style: none; }
+
+.step {
+  padding: var(--s1) 0;
   border-top: 1px solid var(--line);
 }
 
-.deadlines li:first-child { border-top: 0; padding-top: 0; }
+.step:first-child { border-top: 0; }
 
-.deadline-label { margin: 0; font-weight: 700; }
+/* The whole row is the tap target. */
+.tick {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  min-height: 44px;
+  padding: var(--s2) 0;
+  cursor: pointer;
+}
 
-.deadline-date { margin: var(--s1) 0 0; font-size: var(--fs-h2); font-weight: 700; }
+/* A real checkbox, drawn by hand: a round 26 px box that fills and takes a
+   white tick. appearance:none keeps the input itself - focus, keyboard,
+   screen reader - and only replaces how it looks. */
+.tick-input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  border: 2px solid var(--ink-soft);
+  border-radius: 50%;
+  background: var(--card);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
 
-.deadline-note {
+.tick-input::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  margin-top: -2px;
+  border-bottom: 2.5px solid var(--accent-ink);
+  border-left: 2.5px solid var(--accent-ink);
+  transform: rotate(-45deg) scale(0);
+  transition: transform 180ms ease;
+}
+
+.tick-input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.tick-input:checked::after { transform: rotate(-45deg) scale(1); }
+
+.tick-title { font-weight: 700; }
+
+/* Done: quieter, and still exactly where it was. */
+.step-done .tick-title {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+/* Lined up under the title: the box (26) and its gap (12). Its parts - chip,
+   detail, links, the copy button - each sit on their own line. */
+.step-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-left: 38px;
+}
+
+.step-body > :first-child { margin-top: 0; }
+
+.step-body .step-action {
+  padding-left: 0;
+  text-align: left;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  margin: 0;
+  padding: 2px var(--s2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.step-body .chip { margin-bottom: var(--s1); }
+
+.chip-urgent { background: var(--urgent-bg); color: var(--urgent); }
+.chip-soon { background: var(--amber-bg); color: var(--amber); }
+.chip-later {
+  border-color: var(--line);
+  background: var(--page);
+  color: var(--ink-soft);
+}
+
+/* ---------- plan: dates to know ---------- */
+
+.timeline {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 4px;
+  width: 2px;
+  background: var(--line);
+}
+
+.tl-row {
+  position: relative;
+  padding: 0 0 var(--s4) 28px;
+}
+
+.tl-row:last-child { padding-bottom: 0; }
+
+.tl-row::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line);
+  box-shadow: 0 0 0 3px var(--card);
+}
+
+.tl-mine::before { background: var(--accent); }
+
+.tl-label { margin: 0; font-weight: 700; }
+
+.tl-when {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 2px 0 0;
+}
+
+.tl-date { font-size: var(--fs-small); }
+
+.tl-note {
   margin: 2px 0 0;
   color: var(--ink-soft);
   font-size: var(--fs-caption);
 }
 
-.steps { counter-reset: step; }
+/* ---------- plan: the three folds ---------- */
 
-.steps li {
-  position: relative;
-  counter-increment: step;
-  padding: var(--s3) 0 var(--s3) var(--s6);
+.fold { padding: 0; }
+
+.fold-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 56px;
+  padding: 0 var(--s4);
+  border-radius: var(--radius-card);
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+
+.fold-summary::-webkit-details-marker { display: none; }
+
+.fold-summary > svg:first-child { flex: none; color: var(--accent); }
+
+.fold-summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.fold-title { flex: 1; }
+
+.fold-chevron { flex: none; transition: transform 150ms ease; }
+
+.fold[open] .fold-chevron { transform: rotate(180deg); }
+
+.fold-body { padding: 0 var(--s4) var(--s4); }
+
+/* The cards that were on the page before folds existed are unchanged inside
+   them; they just lose their own frame, so a card is not drawn inside a card. */
+.fold-body .card {
+  margin-top: var(--s4);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.fold-body .card + .card {
+  padding-top: var(--s4);
   border-top: 1px solid var(--line);
 }
-
-.steps li:first-child { border-top: 0; }
-
-.steps li::before {
-  content: counter(step);
-  position: absolute;
-  left: 0;
-  top: var(--s3);
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--ink);
-  font-size: var(--fs-caption);
-  font-weight: 700;
-  text-align: center;
-  line-height: 24px;
-}
-
-.step-title { margin: 0; font-weight: 700; }
-
-.step-detail { margin: var(--s1) 0 0; }
-
-.step-link,
-.deadlines a {
-  display: inline-block;
-  margin-top: var(--s1);
-  min-height: 44px;
-  line-height: 44px;
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.soon h2:not(:first-child) { margin-top: var(--s5); }
 
 .plan-disclaimers {
   margin: var(--s5) 0 0;
@@ -974,6 +1275,8 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 .footer p { margin: var(--s2) 0 0; }
 
+.button-inline { margin-top: var(--s4); }
+
 /* ---------- reading: the shape of what is coming ---------- */
 
 .skeleton { margin-top: var(--s4); }
@@ -1033,6 +1336,26 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   /* Nothing to pin on a desktop: the bar is just the end of the card. */
   .action-bar { position: static; }
 
+  /* The plan is two columns: what to do first on the left, everything else on
+     the right. The summary and the ready banner run across the top of both. */
+  .app-plan { max-width: 1040px; }
+
+  .plan {
+    display: grid;
+    grid-template-columns: 380px minmax(0, 1fr);
+    column-gap: var(--s5);
+    align-items: start;
+  }
+
+  .plan-ready,
+  .pills { grid-column: 1 / -1; }
+
+  /* Ordinary columns - the page scrolls, not either of them - placed in order:
+     the left one first, the right one beside it. */
+
+  /* Everything is already in view: nothing to jump to. */
+  .jump-bar { display: none; }
+
   .screen {
     box-shadow: 0 1px 2px rgba(21, 48, 44, 0.06),
       0 8px 24px rgba(21, 48, 44, 0.06);
@@ -1056,6 +1379,10 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   /* A pulse is decoration: hold it still rather than shorten it to a flicker. */
   .skeleton-label,
   .skeleton-input { animation: none; }
+
+  /* The tick simply is there, and the ticks in the checklist simply are. */
+  .draw-check { animation: none; }
+  .tick-input::after { transition: none; }
 
   /* The spinner says "still working"; frozen it would say the opposite. */
   .spinner {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatIstDate } from "../format";
+import { formatDemoFire } from "../planview";
 import { isEnrolled, looksLikeEmail, stepLabel, stepStatus } from "../reminders";
 import { ErrorNotice, Notice } from "./Notice";
 
@@ -13,10 +14,12 @@ const PRIVACY_NOTE =
   "Reminder emails never contain your amount, account, UPI ID or bank name.";
 
 function StepList({ reminders }) {
+  // Demo reminders fire within minutes, so a date says nothing: show the time.
+  const format = reminders.demo ? (iso) => formatDemoFire(iso) : formatIstDate;
   return (
     <ul className="reminder-steps">
       {reminders.steps.map((entry) => {
-        const status = stepStatus(entry, formatIstDate);
+        const status = stepStatus(entry, format);
         return (
           <li key={entry.step}>
             <p className="reminder-label">{stepLabel(entry.step)}</p>

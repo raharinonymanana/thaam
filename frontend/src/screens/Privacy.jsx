@@ -71,6 +71,10 @@ export default function Privacy({ onBack }) {
           One honest exception: an older voice file from a previous version of
           your plan is removed automatically within 90 days.
         </li>
+        <li>
+          Ticks on your checklist are saved only on this phone. Delete my case
+          now clears them.
+        </li>
       </ul>
 
       <button type="button" className="button" onClick={onBack}>

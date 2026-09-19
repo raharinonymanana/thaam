@@ -50,6 +50,15 @@ export default function Triage({ shared, busy, error, onAnswer, onSubmit, onBack
         answer only changes which deadlines apply.
       </p>
 
+      <button
+        type="button"
+        className="button button-quiet button-inline"
+        onClick={onBack}
+        disabled={busy}
+      >
+        Back to the details
+      </button>
+
       <ErrorNotice error={error} onRetry={onSubmit} busy={busy} />
 
       <ActionBar>
@@ -61,10 +70,6 @@ export default function Triage({ shared, busy, error, onAnswer, onSubmit, onBack
           aria-busy={busy}
         >
           {busy ? "Building your plan…" : "Build my plan"}
-        </button>
-
-        <button type="button" className="button button-quiet" onClick={onBack} disabled={busy}>
-          Back to the details
         </button>
       </ActionBar>
     </Screen>

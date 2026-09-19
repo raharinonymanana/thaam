@@ -5,6 +5,7 @@ import {
 } from "./api";
 import { clearCaseHash, parseCaseHash, setCaseHash } from "./hash";
 import { DECODE_MESSAGE, ENCODE_MESSAGE, prepareImage, REJECT_MESSAGE } from "./image";
+import { clearTicks, ticksKey } from "./planview";
 import { isDemoMode } from "./reminders";
 import { initialState, planPayload, reducer } from "./state";
 import { validateFields } from "./validate";
@@ -45,6 +46,9 @@ const STEPS = {
 // The question-and-answer screens sit in a narrower column on a desktop. The
 // plan is wider and gets its own layout, so it is not in this list.
 const FLOW_SCREENS = ["welcome", "consent", "upload", "extracting", "fields", "triage"];
+
+// The plan and a reopened case share the wide two-column layout on a desktop.
+const PLAN_SCREENS = ["plan", "case"];
 
 function notice(err) {
   if (err instanceof ApiError) return { message: err.message, code: err.code };
@@ -220,6 +224,10 @@ export default function App() {
         return;
       }
     }
+    // The ticked steps are kept on this phone under a hash of the case's ID,
+    // and go with it. The key is worked out here, before the state reset below:
+    // that reset is what loses the ID.
+    clearTicks(await ticksKey(state.caseId));
     requested.current = null;
     // The link must not survive the case it points at (keeps ?demo=1).
     clearCaseHash();
@@ -257,7 +265,10 @@ export default function App() {
   const step = STEPS[state.screen];
 
   return (
-    <div className={`app${FLOW_SCREENS.includes(state.screen) ? " app-flow" : ""}`}>
+    <div
+      className={`app${FLOW_SCREENS.includes(state.screen) ? " app-flow" : ""}${
+        PLAN_SCREENS.includes(state.screen) ? " app-plan" : ""}`}
+    >
       <header className="masthead">
         <p className="brand">
           <LogoMark className="logo-mark" size={36} />

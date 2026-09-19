@@ -94,8 +94,9 @@ export const ICONS = {
 };
 
 /** <Icon name="phone" size={20} />. An unknown name draws nothing, so a typo
- * leaves a gap rather than breaking the screen it sits on. */
-export default function Icon({ name, size = 20, className }) {
+ * leaves a gap rather than breaking the screen it sits on. `draw` gives the
+ * last path the class that animates it being drawn (the tick of circle-check). */
+export default function Icon({ name, size = 20, className, draw = false }) {
   const paths = ICONS[name];
   if (!paths) return null;
   return (
@@ -113,7 +114,9 @@ export default function Icon({ name, size = 20, className }) {
       aria-hidden="true"
       focusable="false"
     >
-      {paths.map((d) => <path key={d} d={d} />)}
+      {paths.map((d, i) => (draw && i === paths.length - 1
+        ? <path key={d} d={d} pathLength="1" className="draw-check" />
+        : <path key={d} d={d} />))}
     </svg>
   );
 }

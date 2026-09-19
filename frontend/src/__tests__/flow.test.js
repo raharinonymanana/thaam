@@ -249,16 +249,18 @@ describe("check the details (S4)", () => {
     expect(html).toContain(">Accounts</h2>");
   });
 
+  // Here the UPI ID was read, so the phone number is not missing: only the
+  // UTR is. (Before H3 the phone number was flagged too.)
   it("marks what was read as Found and what was not as Needs you", () => {
     expect(html.match(/badge badge-found/g)).toHaveLength(6);
-    expect(html.match(/badge badge-needs/g)).toHaveLength(2);
+    expect(html.match(/badge badge-needs/g)).toHaveLength(1);
     expect(text).toContain("Found");
     expect(text).toContain("Needs you");
   });
 
   it("still tells a screen reader what is missing, in the old words", () => {
     const sentence = /<p class="sr-only">Not found — please type it if you can<\/p>/g;
-    expect(html.match(sentence)).toHaveLength(2);
+    expect(html.match(sentence)).toHaveLength(1);
     // The visible pill is hidden from screen readers so it is not said twice.
     expect(html).toContain('badge badge-needs" aria-hidden="true"');
   });
@@ -269,9 +271,64 @@ describe("check the details (S4)", () => {
       fields: { ...found, utr: "426173859012" },
       missingFields: ["utr", "payee_phone"],
     }));
-    expect(typed.match(/badge badge-needs/g)).toHaveLength(1);
+    expect(typed.match(/badge badge-needs/g)).toBeNull();
     // Not "Found" either: it was not found, they supplied it.
     expect(typed.match(/badge badge-found/g)).toHaveLength(6);
+  });
+
+  describe("the UPI ID and the phone number are alternatives (H3)", () => {
+    const base = pickFields({
+      amount: "49999.00", txn_date: "2026-09-17", utr: "426173859012",
+      account_masked: "XX1234", bank: "Sample Bank",
+    });
+    const needs = (fields, missing) => {
+      const out = render(h(Fields, { ...props, fields, missingFields: missing }));
+      // The badge for one field is inside that field's own block.
+      const block = (name) =>
+        out.split('<div class="field').find((chunk) => chunk.includes(`for="${name}"`)) ?? "";
+      return {
+        vpa: block("payee_vpa").includes("badge-needs"),
+        phone: block("payee_phone").includes("badge-needs"),
+        srOnly: (out.match(/<p class="sr-only">Not found/g) ?? []).length,
+      };
+    };
+    const both = ["payee_vpa", "payee_phone"];
+
+    it("flags both when neither was found", () => {
+      expect(needs(base, both)).toEqual({ vpa: true, phone: true, srOnly: 2 });
+    });
+
+    it("flags neither the phone number when the UPI ID is filled in", () => {
+      expect(needs({ ...base, payee_vpa: "refund.help99@okaxis" }, ["payee_phone"]))
+        .toEqual({ vpa: false, phone: false, srOnly: 0 });
+    });
+
+    it("flags neither the UPI ID when the phone number is filled in", () => {
+      expect(needs({ ...base, payee_phone: "9876543210" }, ["payee_vpa"]))
+        .toEqual({ vpa: false, phone: false, srOnly: 0 });
+    });
+
+    it("stops flagging the other as soon as the victim types one", () => {
+      expect(needs({ ...base, payee_vpa: "friend@upi" }, both))
+        .toEqual({ vpa: false, phone: false, srOnly: 0 });
+      expect(needs({ ...base, payee_phone: "9876543210" }, both))
+        .toEqual({ vpa: false, phone: false, srOnly: 0 });
+    });
+
+    it("does not touch any other field's badge", () => {
+      const out = render(h(Fields, {
+        ...props, fields: { ...base, payee_vpa: "friend@upi" },
+        missingFields: ["utr", "bank", "payee_vpa", "payee_phone"],
+      }));
+      // utr and bank were "missing" but are filled in, so they show nothing;
+      // the point is that the rule did not spread past the two payee fields.
+      expect(out.match(/badge-needs/g)).toBeNull();
+      const gap = render(h(Fields, {
+        ...props, fields: { ...base, utr: "", payee_vpa: "friend@upi" },
+        missingFields: ["utr", "payee_phone"],
+      }));
+      expect(gap.match(/badge-needs/g)).toHaveLength(1);
+    });
   });
 
   it("keeps the needed marker and holds Continue in the action bar", () => {
@@ -310,10 +367,26 @@ describe("one question (S5)", () => {
     expect(html).toMatch(/option option-on"[^>]*for="triage-no"|for="triage-no"[^>]*option-on/);
   });
 
-  it("puts Build my plan first and Back second, both in the action bar", () => {
+  it("holds only Build my plan in the action bar (H3)", () => {
     const bar = html.slice(html.indexOf('<div class="action-bar">'));
-    expect(bar.indexOf("Build my plan")).toBeGreaterThan(-1);
-    expect(bar.indexOf("Build my plan")).toBeLessThan(bar.indexOf("Back to the details"));
+    expect(bar).toContain("Build my plan");
+    expect(bar).not.toContain("Back to the details");
+    expect(bar.match(/<button/g)).toHaveLength(1);
+  });
+
+  it("puts Back to the details in the page, directly under the reassurance", () => {
+    const reassure = html.indexOf("Either answer is fine.");
+    const back = html.indexOf("Back to the details");
+    const bar = html.indexOf('<div class="action-bar">');
+    expect(reassure).toBeGreaterThan(-1);
+    expect(back).toBeGreaterThan(reassure);
+    expect(back).toBeLessThan(bar);
+    // Nothing between the reassurance line and the button but its own markup.
+    const between = words(html.slice(reassure, back));
+    expect(between).toBe(
+      "Either answer is fine. Scammers are very good at tricking people. Your answer only changes which deadlines apply.",
+    );
+    expect(html.slice(html.lastIndexOf("<button", back), back)).toContain("button-quiet");
   });
 });
 

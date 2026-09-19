@@ -50,8 +50,8 @@ export default function Case({
 
   return (
     <Screen title="Your plan">
-      <p className="lead">Your case, as you left it.</p>
-      <PlanView caseId={caseId} plan={caseView} onRestart={onRestart} {...rest} />
+      <p className="lead">Welcome back. Your case, as you left it.</p>
+      <PlanView key={caseId} reopened caseId={caseId} plan={caseView} onRestart={onRestart} {...rest} />
     </Screen>
   );
 }
