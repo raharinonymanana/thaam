@@ -9,8 +9,10 @@ import { clearTicks, ticksKey } from "./planview";
 import { isDemoMode } from "./reminders";
 import { pageTitle, screenDirection } from "./screenmeta";
 import { initialState, planPayload, reducer } from "./state";
+import { applyTheme, FADE_MS, nextTheme } from "./theme";
 import { validateFields } from "./validate";
 import Footer from "./components/Footer";
+import Icon from "./components/Icon";
 import LogoMark from "./components/LogoMark";
 import Stepper from "./components/Stepper";
 import Case from "./screens/Case";
@@ -70,6 +72,22 @@ export default function App() {
   const latest = useRef(state);
 
   useEffect(() => { latest.current = state; });
+
+  // Light on every visit (H6). The theme is App state, not reducer state and not
+  // stored: it lives as long as the page does, so a reload is light again.
+  const [theme, setTheme] = useState("light");
+  const fadeTimer = useRef(null);
+  useEffect(() => { applyTheme(theme); }, [theme]);
+  useEffect(() => () => clearTimeout(fadeTimer.current), []);
+
+  // The cross-fade class goes on <html> for one toggle only, never on load.
+  function toggleTheme() {
+    const root = document.documentElement;
+    root.classList.add("theme-fade");
+    clearTimeout(fadeTimer.current);
+    fadeTimer.current = setTimeout(() => root.classList.remove("theme-fade"), FADE_MS);
+    setTheme(nextTheme);
+  }
 
   // The tab title follows the screen (WCAG 2.4.2). It is read from the heading
   // that is on screen, so it can never disagree with it.
@@ -289,6 +307,14 @@ export default function App() {
           <LogoMark className="logo-mark" size={36} />
           <span>Thaam <span className="brand-hi" lang="hi">थाम</span></span>
         </p>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          <Icon name={theme === "dark" ? "sun" : "moon"} size={22} />
+        </button>
       </header>
 
       <main key={state.screen} data-dir={move.dir}>

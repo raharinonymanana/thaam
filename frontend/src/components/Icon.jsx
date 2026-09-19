@@ -1,7 +1,7 @@
 /** The only icon set in the app (D131).
  *
  * Lucide geometry, pasted as path data rather than pulled from a package: the
- * seventeen icons below are a few hundred bytes, an icon dependency is tens of
+ * nineteen icons below are a few hundred bytes, an icon dependency is tens of
  * kilobytes, and nothing here may be fetched from someone else's server.
  *
  * Every icon is decoration beside a word - never the only carrier of meaning -
@@ -90,6 +90,20 @@ export const ICONS = {
     "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
     "M12 8v4",
     "M12 16h.01",
+  ],
+  sun: [
+    "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+    "M12 2v2",
+    "M12 20v2",
+    "m4.93 4.93 1.41 1.41",
+    "m17.66 17.66 1.41 1.41",
+    "M2 12h2",
+    "M20 12h2",
+    "m6.34 17.66-1.41 1.41",
+    "m19.07 4.93-1.41 1.41",
+  ],
+  moon: [
+    "M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401",
   ],
 };
 

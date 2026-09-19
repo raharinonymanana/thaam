@@ -53,24 +53,24 @@
   -webkit-text-size-adjust: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page: #0e1817;
-    --card: #15221f;
-    --ink: #e4eeeb;
-    --ink-soft: #a2b6b1;
-    --line: #283935;
-    --accent: #5cc4b1;
-    --accent-ink: #062320;
-    --accent-soft: #173631;
-    --amber: #e8b662;
-    --amber-bg: #2b2312;
-    --urgent: #f28b80;
-    --urgent-bg: #2e1a18;
-    --info-bg: #1a2b28;
-    --focus: #5cc4b1;
-  }
+/* Dark is only ever chosen with the toggle (H6): App sets data-theme="dark" on
+   <html>. Nothing reads the OS setting, so the app always opens light. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0e1817;
+  --card: #15221f;
+  --ink: #e4eeeb;
+  --ink-soft: #a2b6b1;
+  --line: #283935;
+  --accent: #5cc4b1;
+  --accent-ink: #062320;
+  --accent-soft: #173631;
+  --amber: #e8b662;
+  --amber-bg: #2b2312;
+  --urgent: #f28b80;
+  --urgent-bg: #2e1a18;
+  --info-bg: #1a2b28;
+  --focus: #5cc4b1;
 }
 
 * { box-sizing: border-box; }
@@ -111,7 +111,28 @@ main { flex: 1; }
 
 /* ---------- masthead ---------- */
 
-.masthead { padding: var(--s2) 0 0; }
+.masthead {
+  display: flex;
+  align-items: center;
+  padding: var(--s2) 0 0;
+}
+
+/* Icon only, and it shows the theme a tap switches TO. 44 px is the tap target;
+   the glyph is 22 px. Focus uses the shared ring. */
+.theme-toggle {
+  flex: none;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
 
 .brand {
   display: flex;
@@ -1409,8 +1430,8 @@ input[type="radio"] { accent-color: var(--accent); }
   }
 }
 
-@media (min-width: 960px) and (prefers-color-scheme: dark) {
-  .screen { box-shadow: none; }
+@media (min-width: 960px) {
+  :root[data-theme="dark"] .screen { box-shadow: none; }
 }
 
 /* ---------- entry motion (D137) ----------
@@ -1463,6 +1484,19 @@ input[type="radio"] { accent-color: var(--accent); }
   }
 }
 
+/* ---------- theme switch (H6) ----------
+   Only while the toggle's class is on <html>, so loading never fades. The
+   reduced-motion rule below still wins by simply not matching here. */
+@media (prefers-reduced-motion: no-preference) {
+  :root.theme-fade,
+  :root.theme-fade *,
+  :root.theme-fade *::before,
+  :root.theme-fade *::after {
+    transition: background-color 200ms ease, color 200ms ease,
+      border-color 200ms ease !important;
+  }
+}
+
 /* ---------- hover (D137) ----------
    For a pointer that can hover - never a width query, so a phone or a narrow
    window with a mouse behaves right and a touch screen never gets a hover that
@@ -1482,6 +1516,8 @@ input[type="radio"] { accent-color: var(--accent); }
     background-color: var(--accent-soft);
   }
 
+  .theme-toggle:hover { background-color: var(--accent-soft); }
+
   .fold-summary:hover,
   .tick:hover { background-color: var(--accent-soft); }
 
@@ -1498,8 +1534,8 @@ input[type="radio"] { accent-color: var(--accent); }
   [lang="hi"] .linkish:hover { border-bottom-color: var(--accent); }
 }
 
-@media (hover: hover) and (pointer: fine) and (prefers-color-scheme: dark) {
-  .button:not(:disabled):not(:active):hover { filter: brightness(1.05); }
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="dark"] .button:not(:disabled):not(:active):hover { filter: brightness(1.05); }
 }
 
 /* Under reduced motion the colours above still change; what is left out is
@@ -1513,9 +1549,8 @@ input[type="radio"] { accent-color: var(--accent); }
   .dropzone:hover .dropzone-icon { transform: scale(1.05); }
 }
 
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)
-  and (prefers-color-scheme: dark) {
-  .button:not(:disabled):not(:active):hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :root[data-theme="dark"] .button:not(:disabled):not(:active):hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
 }
 
 /* ---------- reduced motion ---------- */

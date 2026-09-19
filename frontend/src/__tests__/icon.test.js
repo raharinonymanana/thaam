@@ -14,10 +14,11 @@ const NAMES = [
   "phone", "check", "circle-check", "shield-check", "scale", "trash-2",
   "image-plus", "camera", "lock-keyhole", "clock", "bell", "users",
   "file-text", "copy", "chevron-down", "arrow-left", "circle-alert",
+  "sun", "moon",   // H6: the theme toggle
 ];
 
 describe("the icon map", () => {
-  it("has all seventeen names", () => {
+  it("has all nineteen names", () => {
     expect(Object.keys(ICONS).sort()).toEqual([...NAMES].sort());
   });
 
