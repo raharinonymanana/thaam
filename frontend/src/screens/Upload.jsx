@@ -82,14 +82,6 @@ export default function Upload({ file, busy, error, onChoose, onSubmit }) {
         )}
       </div>
 
-      <p className="row hint">
-        <Icon name="lock-keyhole" size={20} />
-        <span>
-          Your screenshot is resized on this phone and its location data removed
-          before upload. PNG or JPEG.
-        </span>
-      </p>
-
       <ErrorNotice error={rejected} />
       <ErrorNotice error={error} onRetry={() => onSubmit(file)} busy={busy} />
 

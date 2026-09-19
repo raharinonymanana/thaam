@@ -16,7 +16,6 @@ import Extracting from "../screens/Extracting";
 import Fields from "../screens/Fields";
 import Triage from "../screens/Triage";
 import Upload from "../screens/Upload";
-import Welcome from "../screens/Welcome";
 import { READING_STAGES } from "../reading";
 import { pickFields } from "../state";
 
@@ -37,46 +36,6 @@ function words(html) {
 }
 
 const render = (element) => renderToStaticMarkup(element);
-
-describe("welcome (S0)", () => {
-  const html = render(h(Welcome, { onContinue: noop }));
-  const text = words(html);
-
-  it("asks the question in the title", () => {
-    expect(html).toContain("<h1");
-    expect(text).toContain("Money left your account? We'll take this one step at a time.");
-  });
-
-  it("puts the 1930 call first, as the hero", () => {
-    expect(html).toContain('class="card call-now"');
-    expect(text).toContain("Do this first");
-    expect(text).toContain(
-      "In the first hour, 1930 can sometimes freeze the money before it moves on.",
-    );
-    expect(html).toMatch(/<a class="button button-call" href="tel:1930">/);
-    expect(text).toContain("Call 1930 now");
-  });
-
-  it("says the three things Thaam is not, in three rows", () => {
-    expect(text).toContain("Thaam never files anything for you. You stay in control.");
-    expect(text).toContain("Not a bank, not the police, not the government.");
-    expect(text).toContain("Delete your case any time, in one tap.");
-    expect(html.match(/<li class="row"/g)).toHaveLength(3);
-  });
-
-  it("keeps the call the only filled button", () => {
-    // The action-bar button is the quiet one, so nothing competes with the call.
-    const buttons = [...html.matchAll(/<(?:a|button)\b[^>]*class="([^"]*\bbutton\b[^"]*)"/g)]
-      .map(([, cls]) => cls);
-    const filled = buttons.filter((cls) => !cls.includes("button-quiet"));
-    expect(filled).toEqual(["button button-call"]);
-    expect(text).toContain("Get my plan · about 2 minutes");
-  });
-
-  it("lives in the action bar", () => {
-    expect(html).toMatch(/<div class="action-bar"><button[^>]*button-quiet/);
-  });
-});
 
 describe("consent (S1): every sentence survives verbatim", () => {
   const html = render(h(Consent, { consent: false, onToggle: noop, onContinue: noop }));
@@ -166,12 +125,9 @@ describe("upload (S2)", () => {
     expect(text).toContain("Take a photo or choose from gallery");
   });
 
-  it("keeps the lead and the privacy sentence verbatim", () => {
+  it("keeps the lead verbatim (the lock row was cut in H5: see h5.test.js)", () => {
     expect(text).toContain(
       "The SMS or UPI app screen that shows the money leaving your account.",
-    );
-    expect(text).toContain(
-      "Your screenshot is resized on this phone and its location data removed before upload. PNG or JPEG.",
     );
   });
 

@@ -289,7 +289,6 @@ export default function App() {
           <LogoMark className="logo-mark" size={36} />
           <span>Thaam <span className="brand-hi" lang="hi">थाम</span></span>
         </p>
-        <p className="brand-sub">Steady steps after an online payment fraud</p>
       </header>
 
       <main key={state.screen} data-dir={move.dir}>
@@ -373,7 +372,7 @@ export default function App() {
         )}
       </main>
 
-      <Footer onOpenPrivacy={openPrivacy} />
+      <Footer key={`about-${state.screen}`} onOpenPrivacy={openPrivacy} />
     </div>
   );
 }

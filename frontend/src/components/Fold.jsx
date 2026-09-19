@@ -7,7 +7,8 @@ import Icon from "./Icon";
  * "Copy complaint text" and the jump bar's "More". The browser's own toggling
  * (a tap, the keyboard) is reported back through onToggle so the two agree.
  * The body is always rendered, only hidden: a closed fold still has its inputs
- * in the page, which is what lets a label find them.
+ * in the page, which is what lets a label find them. Without an onToggle it is
+ * an ordinary uncontrolled fold, opened and closed by the browser alone.
  */
 export default function Fold({ id, icon, title, open, onToggle, children }) {
   return (
@@ -15,7 +16,7 @@ export default function Fold({ id, icon, title, open, onToggle, children }) {
       id={id}
       className="fold card"
       open={open}
-      onToggle={(event) => onToggle(event.currentTarget.open)}
+      onToggle={onToggle && ((event) => onToggle(event.currentTarget.open))}
     >
       <summary className="fold-summary">
         <Icon name={icon} size={20} />

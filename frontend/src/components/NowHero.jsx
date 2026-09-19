@@ -71,6 +71,9 @@ function Script({ caseId, script }) {
   return (
     <div className="script-block">
       <h2>Your call script</h2>
+      <p className="hint">
+        1930 is the national cyber crime helpline. Read the script below to them.
+      </p>
 
       <div className="tabs" role="tablist" aria-label="Script language">
         {LANGUAGES.map((option) => (
@@ -132,9 +135,6 @@ export default function NowHero({ caseId, clocks, script }) {
         Call 1930 now
       </a>
       {line && <p className="golden">{line}</p>}
-      <p className="hint">
-        1930 is the national cyber crime helpline. Read the script below to them.
-      </p>
       <Script caseId={caseId} script={script} />
     </section>
   );

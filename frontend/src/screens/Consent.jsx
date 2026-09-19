@@ -1,4 +1,5 @@
 import ActionBar from "../components/ActionBar";
+import Fold from "../components/Fold";
 import Icon from "../components/Icon";
 import Screen from "../components/Screen";
 
@@ -31,24 +32,27 @@ function Rows({ items }) {
 
 /** What Thaam stores and what it is not - before anything is uploaded.
  *
- * Nothing on this screen calls the API: consent travels with the request that
- * creates the case, at the moment the screenshot is actually uploaded. The link
- * to the privacy page is not repeated here - it is in the footer, in the same
- * place on every screen.
+ * The screen asks one thing: agree, or not. Everything being agreed to is in a
+ * fold directly above the checkbox, closed until asked for, so the checkbox's
+ * "as described above" is true and the screen is a heading, a fold, a tick and
+ * a button. Nothing here calls the API: consent travels with the request that
+ * creates the case, at the moment the screenshot is actually uploaded.
  */
 export default function Consent({ consent, onToggle, onContinue }) {
   return (
     <Screen title="Before we start">
-      <p className="lead">
-        Thaam helps you take the right steps in the first hours after an online
-        payment fraud, in the order that matters.
-      </p>
+      <Fold icon="shield-check" title="What you're agreeing to">
+        <p className="lead">
+          Thaam helps you take the right steps in the first hours after an online
+          payment fraud, in the order that matters.
+        </p>
 
-      <h2>What we keep</h2>
-      <Rows items={KEEP} />
+        <h2>What we keep</h2>
+        <Rows items={KEEP} />
 
-      <h2>What Thaam does not do</h2>
-      <Rows items={DOES_NOT} />
+        <h2>What Thaam does not do</h2>
+        <Rows items={DOES_NOT} />
+      </Fold>
 
       {/* id + htmlFor, not just nesting: with nesting alone a checkbox can end
           up announced as "on" (its default value) instead of the sentence

@@ -135,12 +135,6 @@ main { flex: 1; }
   line-height: 1.1;    /* one line in the masthead; the 1.8 above is for prose */
 }
 
-.brand-sub {
-  margin: var(--s1) 0 0;
-  color: var(--ink-soft);
-  font-size: var(--fs-small);
-}
-
 /* ---------- screen ---------- */
 
 .screen-icon {
@@ -242,7 +236,7 @@ ul.plain li { margin-bottom: var(--s1); }
   border-color: var(--line);
 }
 
-:where(button, input, a, textarea, [tabindex]):focus-visible {
+:where(button, input, a, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -310,8 +304,6 @@ input[type="radio"] { accent-color: var(--accent); }
   color: var(--accent);
 }
 
-p.row { margin: var(--s2) 0 0; padding: 0; }
-
 /* ---------- welcome ---------- */
 
 .eyebrow {
@@ -323,9 +315,68 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   text-transform: uppercase;
 }
 
-.hero-line { margin: 0; }
+.screen-welcome .screen-title { font-size: 28px; line-height: 1.2; }
 
-.screen > .rows { margin-top: var(--s4); }
+.screen-welcome .lead { color: var(--ink-soft); font-size: 16px; }
+
+/* The journey: three equal cards, told at a glance. Not controls. */
+.journey {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journey li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) var(--s1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.journey-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.journey-num {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+}
+
+.screen-welcome .button-call { min-height: 54px; margin-top: var(--s5); }
+
+.note {
+  font-size: var(--fs-caption);
+  text-align: center;
+}
+
 
 /* ---------- step indicator ---------- */
 
@@ -337,7 +388,8 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   gap: var(--s3);
 }
 
-.stepper-text {
+.stepper-text,
+.footer {
   color: var(--ink-soft);
   font-size: var(--fs-caption);
 }
@@ -440,12 +492,15 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 /* Colour is never the only signal: each of these carries an icon, and the
    sentence inside says what happened on its own. */
-.notice-warn {
+.notice-warn,
+.badge-needs,
+.chip-soon {
   background: var(--amber-bg);
   color: var(--amber);
 }
 
-.notice-error {
+.notice-error,
+.chip-urgent {
   background: var(--urgent-bg);
   color: var(--urgent);
 }
@@ -470,17 +525,14 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 /* ---------- footer ---------- */
 
-.footer {
-  color: var(--ink-soft);
-  font-size: var(--fs-caption);
+/* One centred row, the same on every screen. It is a fold-summary underneath,
+   so it hovers, focuses and turns its chevron the way every other fold does. */
+.about-summary {
+  justify-content: center;
+  min-height: 44px;
 }
 
-.footer ul {
-  margin: 0;
-  padding-left: var(--s4);
-}
-
-.footer li { margin-bottom: var(--s1); }
+.about .plain { margin-bottom: var(--s3); }
 
 /* ---------- the eight fields ---------- */
 
@@ -513,8 +565,6 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 }
 
 .badge-found { background: var(--accent-soft); color: var(--accent); }
-
-.badge-needs { background: var(--amber-bg); color: var(--amber); }
 
 /* ---------- the details, in two cards ---------- */
 
@@ -607,12 +657,14 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   transition: border-color 150ms ease;
 }
 
-.field input:not([type="file"]):focus {
+.field input:not([type="file"]):focus,
+.input-prefixed:focus-within {
   border-color: var(--accent);
   border-width: 2px;
 }
 
-.field-bad input { border-color: var(--urgent); border-width: 2px; }
+.field-bad input,
+.field-bad .input-prefixed { border-color: var(--urgent); border-width: 2px; }
 
 .field-error {
   margin: var(--s2) 0 0;
@@ -630,10 +682,6 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   background: var(--card);
   overflow: hidden;
 }
-
-.input-prefixed:focus-within { border-color: var(--accent); border-width: 2px; }
-
-.field-bad .input-prefixed { border-color: var(--urgent); border-width: 2px; }
 
 .input-prefixed .prefix {
   display: flex;
@@ -888,7 +936,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 }
 
 /* Every place the bar jumps to stops short of it. */
-#now, #checklist, #dates, #more, #documents { scroll-margin-top: 80px; }
+.card { scroll-margin-top: 80px; }
 
 /* ---------- plan: progress ---------- */
 
@@ -921,7 +969,9 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 .call-now .script { background: var(--card); }
 
-.script-block h2 { margin: var(--s5) 0 var(--s2); }
+.script-block h2 { margin: var(--s5) 0 var(--s1); }
+
+.script-block .hint { margin: 0 0 var(--s2); font-size: var(--fs-caption); }
 
 /* Something the caller fills in or says aloud. Amber, and bracketed in the
    text itself, so it is not the colour alone that marks it. */
@@ -1043,8 +1093,6 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 .step-body .chip { margin-bottom: var(--s1); }
 
-.chip-urgent { background: var(--urgent-bg); color: var(--urgent); }
-.chip-soon { background: var(--amber-bg); color: var(--amber); }
 .chip-later {
   border-color: var(--line);
   background: var(--page);
@@ -1131,12 +1179,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 .fold-summary > svg:first-child { flex: none; color: var(--accent); }
 
-.fold-summary:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.fold-title { flex: 1; }
+.fold-title { flex: 1; text-wrap: balance; }
 
 .fold-chevron { flex: none; transition: transform 150ms ease; }
 
@@ -1279,8 +1322,6 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   font-size: var(--fs-caption);
 }
 
-.footer p { margin: var(--s2) 0 0; }
-
 .button-inline { margin-top: var(--s4); }
 
 /* ---------- reading: the shape of what is coming ---------- */
@@ -1397,7 +1438,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   .screen > :nth-child(3) { animation-delay: 80ms; }
   .screen > :nth-child(4) { animation-delay: 120ms; }
   .screen > :nth-child(n + 5) { animation-delay: 160ms; }
-  .screen > .call-now,
+  .screen > .button,
   .screen > .plan,
   .screen > .action-bar,
   .screen > .error-box,
