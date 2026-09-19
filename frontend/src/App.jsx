@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   ApiError, buildPlan, createCase, deleteCase, enrolReminders, extract, getCase,
   shareWithFamily, uploadToS3, UNEXPECTED_MESSAGE,
@@ -7,6 +7,7 @@ import { clearCaseHash, parseCaseHash, setCaseHash } from "./hash";
 import { DECODE_MESSAGE, ENCODE_MESSAGE, prepareImage, REJECT_MESSAGE } from "./image";
 import { clearTicks, ticksKey } from "./planview";
 import { isDemoMode } from "./reminders";
+import { pageTitle, screenDirection } from "./screenmeta";
 import { initialState, planPayload, reducer } from "./state";
 import { validateFields } from "./validate";
 import Footer from "./components/Footer";
@@ -69,6 +70,20 @@ export default function App() {
   const latest = useRef(state);
 
   useEffect(() => { latest.current = state; });
+
+  // The tab title follows the screen (WCAG 2.4.2). It is read from the heading
+  // that is on screen, so it can never disagree with it.
+  useEffect(() => {
+    document.title = pageTitle(state.screen, document.querySelector("h1")?.textContent);
+  });
+
+  // Which way the page moves into this screen, for the entry animation. State
+  // that follows another value is adjusted while rendering, not in an effect:
+  // React re-renders at once, so the screen never shows with a stale direction.
+  const [move, setMove] = useState({ screen: state.screen, dir: "fade" });
+  if (move.screen !== state.screen) {
+    setMove({ screen: state.screen, dir: screenDirection(move.screen, state.screen) });
+  }
 
   const loadCase = useCallback(async (caseId) => {
     requested.current = caseId;
@@ -277,9 +292,9 @@ export default function App() {
         <p className="brand-sub">Steady steps after an online payment fraud</p>
       </header>
 
-      {step && <Stepper step={step.step} of={3} label={step.label} />}
+      <main key={state.screen} data-dir={move.dir}>
+        {step && <Stepper step={step.step} of={3} label={step.label} />}
 
-      <main>
         {state.screen === "welcome" && (
           <Welcome onContinue={() => dispatch({ type: "welcome_continued" })} />
         )}

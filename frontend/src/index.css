@@ -23,18 +23,10 @@
   --info-bg: #e8f1ee;
   --focus: #0b6b60;
 
-  /* The older names the rest of this file grew up with, kept as aliases so a
-     rule written against either spelling means the same colour. */
-  --warn-line: var(--amber);
-  --warn-bg: var(--amber-bg);
-  --error-line: var(--urgent);
-  --error-bg: var(--urgent-bg);
-
   /* ---- shape ---- */
   --radius-btn: 12px;
   --radius-card: 16px;
   --radius-chip: 999px;
-  --radius: var(--radius-btn);   /* alias: the default for small surfaces */
   --tap: 48px;                   /* every control is at least this tall */
 
   /* ---- spacing, on a 4 px grid ---- */
@@ -44,8 +36,6 @@
   --s4: 16px;
   --s5: 24px;
   --s6: 32px;
-  --s7: 48px;   /* the grid continued, for the two largest gaps */
-  --s8: 64px;
 
   /* ---- type ---- */
   --fs-caption: 13px;
@@ -56,7 +46,7 @@
   --sans: "Noto Sans", "Noto Sans Devanagari", system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
 
-  color-scheme: light dark;
+  color-scheme: light;
   font: var(--fs-body)/1.55 var(--sans);
   color: var(--ink);
   background: var(--page);
@@ -65,6 +55,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --page: #0e1817;
     --card: #15221f;
     --ink: #e4eeeb;
@@ -152,6 +143,13 @@ main { flex: 1; }
 
 /* ---------- screen ---------- */
 
+.screen-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--s3);
+  color: var(--accent);
+}
+
 .screen {
   background: var(--card);
   border: 1px solid var(--line);
@@ -184,7 +182,7 @@ h2 {
   line-height: 1.3;
 }
 
-.lead { margin: 0 0 var(--s4); }
+.lead { margin: 0 0 var(--s4); text-wrap: pretty; }
 
 .hint {
   margin: var(--s2) 0 0;
@@ -218,11 +216,16 @@ ul.plain li { margin-bottom: var(--s1); }
   font-weight: 700;
   text-align: center;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease,
-    transform 100ms ease, filter 100ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease,
+    box-shadow 150ms ease, transform 150ms ease, filter 150ms ease;
 }
 
-.button:active { transform: scale(0.98); filter: brightness(0.95); }
+/* Pressing answers at once; letting go eases back. */
+.button:active {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+  transition-duration: 0s;
+}
 
 .button:disabled {
   opacity: 0.5;
@@ -327,6 +330,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 /* ---------- step indicator ---------- */
 
 .stepper {
+  margin-bottom: var(--s4);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -372,6 +376,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 .dropzone-off { opacity: 0.5; cursor: not-allowed; }
 
 .dropzone-icon {
+  transition: transform 150ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -534,6 +539,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 .compare { margin-bottom: var(--s2); }
 
 .compare-toggle {
+  transition: background-color 150ms ease;
   display: flex;
   align-items: center;
   gap: var(--s3);
@@ -601,11 +607,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   transition: border-color 150ms ease;
 }
 
-.field input[type="text"]:focus,
-.field input[type="tel"]:focus,
-.field input[type="date"]:focus,
-.field input[type="time"]:focus,
-.field input[type="email"]:focus {
+.field input:not([type="file"]):focus {
   border-color: var(--accent);
   border-width: 2px;
 }
@@ -744,10 +746,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   text-align: center;
   text-decoration: none;
   line-height: 1.4;
-  transition: transform 100ms ease, filter 100ms ease;
 }
-
-.button-call:active { transform: scale(0.98); filter: brightness(0.95); }
 
 .golden {
   margin: var(--s3) 0 0;
@@ -876,8 +875,9 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   display: inline-flex;
   flex: none;
   align-items: center;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 10px;
+  transition: background-color 150ms ease, border-color 150ms ease;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-chip);
   background: var(--card);
@@ -888,7 +888,7 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 }
 
 /* Every place the bar jumps to stops short of it. */
-#now, #checklist, #dates, #more, #documents { scroll-margin-top: 72px; }
+#now, #checklist, #dates, #more, #documents { scroll-margin-top: 80px; }
 
 /* ---------- plan: progress ---------- */
 
@@ -960,8 +960,11 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   align-items: flex-start;
   gap: var(--s3);
   min-height: 44px;
-  padding: var(--s2) 0;
+  margin: 0 calc(-1 * var(--s2));   /* the row's text and box stay where they were */
+  padding: var(--s2);
+  border-radius: var(--radius-btn);
   cursor: pointer;
+  transition: background-color 150ms ease;
 }
 
 /* A real checkbox, drawn by hand: a round 26 px box that fills and takes a
@@ -1109,7 +1112,10 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
 
 .fold { padding: 0; }
 
+.fold { transition: border-color 150ms ease; }
+
 .fold-summary {
+  transition: background-color 150ms ease;
   display: flex;
   align-items: center;
   gap: var(--s3);
@@ -1366,27 +1372,120 @@ p.row { margin: var(--s2) 0 0; padding: 0; }
   .screen { box-shadow: none; }
 }
 
-/* ---------- motion ---------- */
+/* ---------- entry motion (D137) ----------
+   Transform and opacity only, once per arrival, nothing loops. All of it lives
+   in no-preference: under reduced motion there is nothing to switch off.
+   backwards fill keeps a delayed child hidden until its turn and leaves no
+   transform behind afterwards. */
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide { from { opacity: 0; transform: translateX(var(--dx)); } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes pop { from { transform: scale(0.9); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The card comes in from the side it was reached from (App sets data-dir). */
+  main > .screen { animation: fade 220ms ease-out; }
+  main[data-dir="forward"] > .screen { --dx: 24px; animation-name: slide; }
+  main[data-dir="back"] > .screen { --dx: -24px; animation-name: slide; }
+
+  /* Its children follow, 40 ms apart: the heading first, and from the fifth on
+     all together. The call, the action bar and anything that reports a result
+     are never held back. */
+  .screen > * { animation: rise 200ms ease-out backwards; }
+  .screen > :nth-child(2) { animation-delay: 40ms; }
+  .screen > :nth-child(3) { animation-delay: 80ms; }
+  .screen > :nth-child(4) { animation-delay: 120ms; }
+  .screen > :nth-child(n + 5) { animation-delay: 160ms; }
+  .screen > .call-now,
+  .screen > .plan,
+  .screen > .action-bar,
+  .screen > .error-box,
+  .screen > .notice { animation-delay: 0s; }
+
+  .badge-found { animation: pop 180ms ease-out; }
+  .fade-in { animation: fade 150ms ease-out; }
+}
+
+/* A fold opens and closes by height, where the browser can animate it. */
+@supports selector(details::details-content) {
+  @media (prefers-reduced-motion: no-preference) {
+    :root { interpolate-size: allow-keywords; }
+
+    .fold::details-content {
+      block-size: 0;
+      overflow: clip;
+      transition: block-size 200ms ease, content-visibility 200ms allow-discrete;
+    }
+
+    .fold[open]::details-content { block-size: auto; }
+  }
+}
+
+/* ---------- hover (D137) ----------
+   For a pointer that can hover - never a width query, so a phone or a narrow
+   window with a mouse behaves right and a touch screen never gets a hover that
+   sticks. Only things that can be pressed react; cards, text and the timeline
+   never do. Focus is a separate thing and is not touched here. */
+
+@media (hover: hover) and (pointer: fine) {
+  .button:not(:disabled):not(:active):hover { filter: brightness(0.95); }
+
+  .button-quiet:not(:disabled):hover,
+  .tab:not(.tab-on):hover,
+  .jump-pill:hover,
+  .option:hover,
+  .check:hover,
+  .compare-toggle:hover {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
   }
 
-  /* A pulse is decoration: hold it still rather than shorten it to a flicker. */
-  .skeleton-label,
-  .skeleton-input { animation: none; }
+  .fold-summary:hover,
+  .tick:hover { background-color: var(--accent-soft); }
 
-  /* The tick simply is there, and the ticks in the checklist simply are. */
-  .draw-check { animation: none; }
-  .tick-input::after { transition: none; }
+  .fold:has(> .fold-summary:hover),
+  .dropzone:hover { border-color: var(--accent); }
 
-  /* The spinner says "still working"; frozen it would say the opposite. */
-  .spinner {
-    animation-duration: 3s !important;
-    animation-iteration-count: infinite !important;
+  a:hover,
+  .linkish:hover {
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
+  }
+
+  [lang="hi"] a:hover,
+  [lang="hi"] .linkish:hover { border-bottom-color: var(--accent); }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-color-scheme: dark) {
+  .button:not(:disabled):not(:active):hover { filter: brightness(1.05); }
+}
+
+/* Under reduced motion the colours above still change; what is left out is
+   everything that moves or casts a shadow. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .button:not(:disabled):not(:active):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(11, 107, 96, 0.18);
+  }
+
+  .dropzone:hover .dropzone-icon { transform: scale(1.05); }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)
+  and (prefers-color-scheme: dark) {
+  .button:not(:disabled):not(:active):hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); }
+}
+
+/* ---------- reduced motion ---------- */
+
+/* Nothing animates and nothing eases: not the entry, not a tick being drawn, not
+   the loading ring - the words on the reading screen already say what is
+   happening. Colours still change on hover; they just change at once. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -193,6 +193,14 @@ describe("the plan page, unauthorised path", () => {
     expect(text).toContain("Your case");
   });
 
+  it("gives no fold a tabindex: it would take its summary out of the tab order", () => {
+    // Found by tabbing through the page: a <details tabindex="-1"> is skipped
+    // by Tab together with its <summary>, so the fold could not be opened from
+    // the keyboard. Jumps focus the summary instead (see scrollTo.js).
+    for (const [tag] of html.matchAll(/<details[^>]*>/g)) expect(tag).not.toMatch(/tabindex/i);
+    for (const [tag] of html.matchAll(/<summary[^>]*>/g)) expect(tag).not.toMatch(/tabindex="-1"/);
+  });
+
   it("still renders every fold's contents, so their inputs and labels exist", () => {
     expect(html).toContain('id="copy-ncrp"');
     expect(html).toContain('id="copy-letter"');

@@ -19,7 +19,7 @@ let hasNavigated = false;
  * focusHeading is turned off when the screen has somewhere better to send the
  * cursor, such as the field the server has just rejected.
  */
-export default function Screen({ title, focusHeading = true, children }) {
+export default function Screen({ title, icon, focusHeading = true, children }) {
   const heading = useRef(null);
 
   useEffect(() => {
@@ -32,7 +32,14 @@ export default function Screen({ title, focusHeading = true, children }) {
 
   return (
     <section className="screen">
-      <h1 className="screen-title" ref={heading} tabIndex={-1}>{title}</h1>
+      {icon ? (
+        <div className="screen-head">
+          <span className="screen-icon">{icon}</span>
+          <h1 className="screen-title" ref={heading} tabIndex={-1}>{title}</h1>
+        </div>
+      ) : (
+        <h1 className="screen-title" ref={heading} tabIndex={-1}>{title}</h1>
+      )}
       {children}
     </section>
   );

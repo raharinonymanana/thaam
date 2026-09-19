@@ -151,14 +151,26 @@ export default function PlanView({
 
   // "Copy complaint text" opens the fold and, once it is open, lands on the box.
   // Focus goes to the textarea so the copy is one press away and a screen
-  // reader is told where it went. Scrolling is separate so it can respect
-  // reduced motion.
+  // reader is told where it went. A fold that opens by animating its height
+  // keeps its contents unrendered for the first frame, and focus() on something
+  // unrendered does nothing - so it is retried on the next frames until it
+  // takes. Scrolling comes after, and again when the fold has finished growing,
+  // because the page is not tall enough to centre the box until then.
   useEffect(() => {
-    if (!copyRequest) return;
-    const box = document.getElementById(copyRequest.id);
-    if (!box) return;
-    box.focus({ preventScroll: true });
-    box.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+    if (!copyRequest) return undefined;
+    let frame = 0;
+    let tries = 0;
+    const box = () => document.getElementById(copyRequest.id);
+    const centre = () => box()?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+    const land = () => {
+      box()?.focus({ preventScroll: true });
+      if (box() && document.activeElement === box()) return centre();
+      if (++tries < 12) frame = requestAnimationFrame(land);
+      return undefined;
+    };
+    land();
+    const settled = setTimeout(centre, 260);
+    return () => { cancelAnimationFrame(frame); clearTimeout(settled); };
   }, [copyRequest]);
 
   if (!plan) return null;

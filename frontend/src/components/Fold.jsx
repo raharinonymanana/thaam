@@ -14,7 +14,6 @@ export default function Fold({ id, icon, title, open, onToggle, children }) {
     <details
       id={id}
       className="fold card"
-      tabIndex={id ? -1 : undefined}
       open={open}
       onToggle={(event) => onToggle(event.currentTarget.open)}
     >

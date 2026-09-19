@@ -209,6 +209,7 @@ export default function Fields({
       <Compare file={file} />
 
       <form
+        id="fields-form"
         noValidate
         onSubmit={(event) => { event.preventDefault(); onContinue(); }}
       >
@@ -239,12 +240,16 @@ export default function Fields({
           </section>
         ))}
 
-        <ActionBar>
-          <button type="submit" className="button" disabled={busy} aria-busy={busy}>
-            Continue
-          </button>
-        </ActionBar>
       </form>
+
+      {/* Outside the form so it is a direct child of the card, where it is
+          pinned and never held back by the arrival animation; the form
+          attribute still makes it this form's submit button. */}
+      <ActionBar>
+        <button type="submit" form="fields-form" className="button" disabled={busy} aria-busy={busy}>
+          Continue
+        </button>
+      </ActionBar>
     </Screen>
   );
 }

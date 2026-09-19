@@ -1,0 +1,55 @@
+/* The two families from D129, cut down to the subsets this app can show.
+ *
+ * Noto Sans: the Latin subset only - English text, digits, punctuation, the
+ * en/em dash, the ellipsis and the euro. Noto Sans Devanagari: the Devanagari
+ * subset only - Hindi, and the rupee sign, which Noto Sans does not carry
+ * (U+20B9 is in the Devanagari range below, so a "₹" falls through to it).
+ * The other subsets the @fontsource packages ship (Cyrillic, Greek,
+ * Vietnamese, Latin Extended) belong to alphabets nothing here is written in.
+ *
+ * woff2 only: every browser that can run this app reads it, and the woff
+ * fallbacks were a second copy of each file nobody would download. The urls
+ * are resolved by Vite, so the files are hashed and cached for good.
+ * unicode-range is copied from each package's own stylesheet. */
+
+@font-face {
+  font-family: "Noto Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Noto Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("@fontsource/noto-sans/files/noto-sans-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Noto Sans Devanagari";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-400-normal.woff2") format("woff2");
+  unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC,
+    U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
+}
+
+@font-face {
+  font-family: "Noto Sans Devanagari";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-700-normal.woff2") format("woff2");
+  unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC,
+    U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
+}

@@ -63,7 +63,7 @@ export default function CopyBox({ id, title, note, text, rows = 12 }) {
 
       <button type="button" className="button button-quiet" onClick={copy}>
         <Icon name={copied ? "check" : "copy"} size={20} />
-        {copied ? "Copied" : "Copy"}
+        <span key={copied} className="fade-in">{copied ? "Copied" : "Copy"}</span>
       </button>
       {/* Announced, so a screen-reader user hears the result of the press. */}
       <p className="copy-status" role="status">

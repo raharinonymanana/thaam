@@ -16,11 +16,17 @@ export function scrollBehavior() {
 }
 
 /** Scroll an element to the top (its scroll-margin keeps it clear of the jump
- * bar) and move focus to it, so a keyboard or screen reader follows the jump. */
+ * bar) and move focus to it, so a keyboard or screen reader follows the jump.
+ *
+ * A fold is a <details>, and it must not be given a tabindex to be focusable:
+ * that takes its summary out of the tab order, and the fold can no longer be
+ * opened from the keyboard. Focus goes to its summary, which is what a person
+ * would press, instead. */
 export function scrollToId(id, block = "start") {
   const el = document.getElementById(id);
   if (!el) return false;
   el.scrollIntoView({ behavior: scrollBehavior(), block });
-  el.focus({ preventScroll: true });
+  const target = el.tagName === "DETAILS" ? el.querySelector(":scope > summary") : el;
+  target?.focus({ preventScroll: true });
   return true;
 }
