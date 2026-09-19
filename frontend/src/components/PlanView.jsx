@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ApiError, getAudio } from "../api";
 import { deadlineRows, ESTIMATED_NOTE, goldenHourLine } from "../format";
 import { ErrorNotice, Notice } from "./Notice";
+import Icon from "./Icon";
 import CopyBox from "./CopyBox";
 import FamilySection from "./FamilySection";
 import RemindersSection from "./RemindersSection";
@@ -25,7 +26,10 @@ function CallNow({ clocks }) {
   return (
     <section className="card call-now">
       <h2>Call 1930 now</h2>
-      <a className="button button-call" href="tel:1930">Call 1930 now</a>
+      <a className="button button-call" href="tel:1930">
+        <Icon name="phone" size={22} />
+        Call 1930 now
+      </a>
       {line && <p className="golden">{line}</p>}
       <p className="hint">
         1930 is the national cyber crime helpline. Read the script below to them.
@@ -210,6 +214,7 @@ function DeleteCase({ confirming, ui, onRequest, onCancel, onConfirm }) {
             disabled={ui.busy}
             aria-busy={ui.busy}
           >
+            <Icon name="trash-2" size={20} />
             {ui.busy ? "Deleting…" : "Yes, delete everything"}
           </button>
           <button

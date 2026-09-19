@@ -9,6 +9,7 @@ import { isDemoMode } from "./reminders";
 import { initialState, planPayload, reducer } from "./state";
 import { validateFields } from "./validate";
 import Footer from "./components/Footer";
+import LogoMark from "./components/LogoMark";
 import Case from "./screens/Case";
 import Consent from "./screens/Consent";
 import Extracting from "./screens/Extracting";
@@ -241,7 +242,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="masthead">
-        <p className="brand">Thaam <span lang="hi">थाम</span></p>
+        <p className="brand">
+          <LogoMark className="logo-mark" size={36} />
+          <span>Thaam <span className="brand-hi" lang="hi">थाम</span></span>
+        </p>
         <p className="brand-sub">Steady steps after an online payment fraud</p>
       </header>
 

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import Icon from "./Icon";
+import { Notice } from "./Notice";
 
 const FEEDBACK_MS = 2000;
 
@@ -10,7 +12,7 @@ const FAILED =
  * The textarea is read-only rather than a <pre>: it can be selected and copied
  * by hand on any phone, which is the fallback when the clipboard API is not
  * available - it needs a secure context, and an older browser may not have it
- * at all. "Copied ✓" is only shown when a copy actually reported success;
+ * at all. "Copied" is only shown when a copy actually reported success;
  * claiming it falsely would send someone to paste an empty clipboard into a
  * government form.
  */
@@ -60,13 +62,14 @@ export default function CopyBox({ id, title, note, text, rows = 12 }) {
       />
 
       <button type="button" className="button button-quiet" onClick={copy}>
-        {copied ? "Copied ✓" : "Copy"}
+        <Icon name={copied ? "check" : "copy"} size={20} />
+        {copied ? "Copied" : "Copy"}
       </button>
       {/* Announced, so a screen-reader user hears the result of the press. */}
       <p className="copy-status" role="status">
         {copied ? "Copied to your clipboard." : ""}
       </p>
-      {failed && !copied && <p className="notice notice-warn">{FAILED}</p>}
+      {failed && !copied && <Notice kind="warn">{FAILED}</Notice>}
     </section>
   );
 }
